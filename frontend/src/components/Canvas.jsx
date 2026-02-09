@@ -22,7 +22,31 @@ const Canvas = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+
+    // --- NATIVE WHEEL HANDLER FOR BETTER ZOOM PERFORMANCE ---
+  const container = containerRef.current;
+  if (!container) return;
+
+  const handleWheelNative = (e) => {
+    // 1. Force prevent default to stop browser-level zooming
+    e.preventDefault();
+
+    const zoomSensitivity = 0.001;
+    const delta = -e.deltaY * zoomSensitivity;
+    
+    setView(prev => {
+      const newScale = Math.min(Math.max(prev.scale + delta, 0.1), 3);
+      return { ...prev, scale: newScale };
+    });
+  };
+
+  // 2. Attach listener with { passive: false } to allow preventDefault()
+  container.addEventListener('wheel', handleWheelNative, { passive: false });
+
+  return () => container.removeEventListener('wheel', handleWheelNative);
+}, []); // Empty dependency array means this runs once on mount
 
   // --- NOTE OPERATIONS ---
   const handleUpdateNote = async (id, changes) => {
@@ -133,7 +157,7 @@ const Canvas = () => {
     <div 
       ref={containerRef}
       className={`w-full h-full overflow-hidden relative bg-[#242424] ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
-      onWheel={handleWheel}
+      //onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
