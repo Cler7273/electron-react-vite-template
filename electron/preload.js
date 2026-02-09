@@ -20,7 +20,6 @@ const IPC_CHANNELS = {
   NOTIFY_PROGRESS: 'notify:progress',
 };
 
-
 contextBridge.exposeInMainWorld('nativeAPI', {
   // Security
   getSecretToken: () => ipcRenderer.invoke('get-secret-token'),
