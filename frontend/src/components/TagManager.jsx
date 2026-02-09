@@ -1,22 +1,26 @@
 import React, { useRef } from "react";
 
-// TagPill expects `tag` to be an object: { name, color_hex }
+// Helper Component for individual Tag Pills
 const TagPill = ({ tag, onRemove, onColorChange }) => (
-    <div onClick={() => onColorChange(tag)} className="flex items-center text-white text-xs font-semibold px-2 py-1 rounded-full cursor-pointer" style={{ backgroundColor: tag.color_hex }} title="Double-click to change color">
+    <div 
+        onClick={() => onColorChange(tag)} 
+        className="flex items-center text-white text-xs font-semibold px-2 py-1 rounded-full cursor-pointer transition-transform hover:scale-105 select-none" 
+        style={{ backgroundColor: tag.color_hex || '#3b82f6' }} 
+        title="Double-click to change color"
+    >
         <span>{tag.name}</span>
         <button
             onClick={(e) => {
                 e.stopPropagation();
                 onRemove(tag.name);
             }}
-            className="ml-2 text-blue-200 hover:text-white"
+            className="ml-2 text-white opacity-50 hover:opacity-100 font-bold"
         >
-            ✕
+            ×
         </button>
     </div>
 );
 
-// MODIFIED: Now accepts onDataChange to trigger a refetch
 const TagManager = ({ tags, onAddTag, onRemoveTag, onDataChange }) => {
     const colorInputRef = useRef(null);
     const tagToChangeRef = useRef(null);
@@ -31,35 +35,56 @@ const TagManager = ({ tags, onAddTag, onRemoveTag, onDataChange }) => {
 
     const handleColorChange = (tag) => {
         tagToChangeRef.current = tag;
-        colorInputRef.current.click(); // Trigger the hidden color input
+        if (colorInputRef.current) colorInputRef.current.click();
     };
 
     const onColorSelected = async (e) => {
         const newColor = e.target.value;
-        const tagName = tagToChangeRef.current.name;
-        if (!tagName || !newColor) return;
+        const tag = tagToChangeRef.current;
+        if (!tag || !newColor) return;
 
         try {
-            await fetch(`http://localhost:4000/api/tags/${tagName}`, {
+            const token = await window.nativeAPI.getSecretToken();
+            await fetch(`http://localhost:4000/api/tags/${tag.name}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
                 body: JSON.stringify({ color_hex: newColor }),
             });
-            onDataChange(); // Call the passed-in function to refetch all data
+            onDataChange(); // Refresh canvas data
         } catch (err) {
             console.error("Failed to update tag color", err);
         }
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-2 p-2 border-t border-black border-opacity-10">
-            <input type="color" ref={colorInputRef} onChange={onColorSelected} className="w-0 h-0 opacity-0 absolute" />
+        <div className="flex flex-wrap items-center gap-2 p-2 border-t border-black border-opacity-10 bg-white bg-opacity-20 mt-auto">
+            {/* Hidden Color Input for Picker */}
+            <input 
+                type="color" 
+                ref={colorInputRef} 
+                onChange={onColorSelected} 
+                className="w-0 h-0 opacity-0 absolute pointer-events-none" 
+            />
 
-            {/* This component correctly expects `tags` to be an array of objects */}
             {(tags || []).map((tag) => (
-                <TagPill key={tag.name} tag={tag} onRemove={onRemoveTag} onColorChange={handleColorChange} />
+                <TagPill 
+                    key={tag.name} 
+                    tag={tag} 
+                    onRemove={onRemoveTag} 
+                    onColorChange={handleColorChange} 
+                />
             ))}
-            <input type="text" onKeyDown={handleKeyDown} placeholder="+ tag" className="bg-transparent text-sm focus:outline-none w-16" onClick={(e) => e.stopPropagation()} />
+            
+            <input 
+                type="text" 
+                onKeyDown={handleKeyDown} 
+                placeholder="+ tag" 
+                className="bg-transparent text-xs text-gray-600 placeholder-gray-400 focus:outline-none w-16 hover:w-24 transition-all" 
+                onClick={(e) => e.stopPropagation()} 
+            />
         </div>
     );
 };
