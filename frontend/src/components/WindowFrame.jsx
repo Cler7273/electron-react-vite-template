@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useRef } from 'react'; // 1. Import useRef
 import Draggable from 'react-draggable';
 
 const WindowFrame = ({ title, onClose, children, initialPos = { x: 100, y: 100 }, width = 500 }) => {
+  const nodeRef = useRef(null); // 2. Create the reference
+
   return (
-    <Draggable handle=".window-header" defaultPosition={initialPos}>
+    <Draggable 
+      handle=".window-header" 
+      defaultPosition={initialPos}
+      nodeRef={nodeRef} // 3. Tell Draggable to use this ref (Stops the error)
+    >
       <div 
+        ref={nodeRef} // 4. Attach the ref to the actual DIV
         className="absolute z-50 flex flex-col bg-white rounded-lg shadow-2xl border border-gray-700 overflow-hidden"
         style={{ width: width, minHeight: '300px' }}
       >
