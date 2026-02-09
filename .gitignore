@@ -17,7 +17,21 @@ frontend/.vite/
 
 dist/
 release/
+win-unpacked/
+release_sure/
 build/
+release_sure$/
+dist/
+release/
+build/
+*.exe
+# Ignore all build outputs
+release_sure$/
+release_sure/
+dist/
+build/
+win-unpacked/
+*.exe
 
 # OS
 .DS_Store

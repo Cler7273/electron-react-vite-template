@@ -1,5 +1,7 @@
 // frontend/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
+// In Dashboard.jsx
+import ShortcutWidget from '../components/ShortcutWidget';
 
 // /!\ WARNING /!\
 // This file was edited to remove all IPC calls to the main process.
@@ -109,7 +111,27 @@ function Dashboard() {
           </button>
         </div>
       </div>
+      // Inside your render/return:
+<div className="absolute top-20 left-20">
+    <ShortcutWidget 
+        shortcut={{ 
+            title: "MPSI Drive", 
+            target: "C:\\Users\\aperonylo\\Documents\\MPSI", 
+            type: "url" 
+        }} 
+    />
+</div>
+<div className="absolute top-40 left-20">
+    <ShortcutWidget 
+        shortcut={{ 
+            title: "Wolfram Alpha", 
+            target: "https://www.wolframalpha.com", 
+            type: "url" 
+        }} 
+    />
+</div>
     </div>
+    
   );
 }
 

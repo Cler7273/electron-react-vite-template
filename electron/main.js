@@ -1,8 +1,13 @@
 // electron/main.js
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { setupIpcHandlers } = require('./ipc-handlers');
-const dbService = require('../backend/services/db-service');
+const { spawn } = require('child_process');
+const crypto = require('crypto');
+// Remove the dbService import from here to prevent "app.getPath is not a function" errors
+// We let the backend handle the DB entirely.
+
+const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
+let backendProcess = null;
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -10,53 +15,45 @@ function createWindow() {
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true, // Security best practice
-      nodeIntegration: false, // Security best practice
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   });
 
-  // Load the React app.
-  // In development, it loads from the Vite dev server.
-  // In production, it loads the static build file.
   if (app.isPackaged) {
     mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
   } else {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools(); // Open dev tools in dev mode
+    mainWindow.webContents.openDevTools();
   }
-
   return mainWindow;
 }
 
-
-// Function to start the backend Node.js server
 function startBackend() {
   const backendPath = path.join(__dirname, '../backend/server.js');
-  backendProcess = spawn('node', [backendPath, SECRET_TOKEN]);
+  const userDataPath = app.getPath('userData');
 
-  backendProcess.stdout.on('data', (data) => {
-    console.log(`Backend: ${data}`);
+  console.log("Starting Backend at:", backendPath);
+  console.log("User Data Path:", userDataPath);
+
+  backendProcess = spawn('node', [backendPath, SECRET_TOKEN, userDataPath], {
+    // IMPORTANT: Set cwd to backend folder so it finds 'better-sqlite3' in node_modules
+    cwd: path.join(__dirname, '../'), 
+    stdio: 'inherit'
   });
 
-  backendProcess.stderr.on('data', (data) => {
-    console.error(`Backend Error: ${data}`);
+  backendProcess.on('error', (err) => {
+    console.error('Failed to start backend process:', err);
   });
 }
 
 app.whenReady().then(async () => {
   startBackend();
-  // Initialize critical services before the UI loads.
-  await dbService.init();
   const mainWindow = createWindow();
 
-  // This is the new, simplified IPC handler setup.
-  // It only handles things the backend CANNOT do, like show an OS dialog.
   ipcMain.handle('get-secret-token', (event) => {
-    // Verify the request is coming from our window for security.
-    if (event.sender === mainWindow.webContents) {
-      return SECRET_TOKEN;
-    }
-    return null; // Deny if from an unknown source
+    if (event.sender === mainWindow.webContents) return SECRET_TOKEN;
+    return null;
   });
   
   ipcMain.handle('dialog:open-file', async () => {
@@ -68,22 +65,16 @@ app.whenReady().then(async () => {
     const { canceled, filePath } = await dialog.showSaveDialog(options);
     return canceled ? null : filePath;
   });
-  // Activate all the backend API endpoints.
-  //setupIpcHandlers(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
 
-});
-// Ensure the backend process is killed when the app quits.
 app.on('quit', () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
+  if (backendProcess) backendProcess.kill();
 });
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
