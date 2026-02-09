@@ -33,12 +33,14 @@ function startBackend() {
   const backendPath = path.join(__dirname, '../backend/server.js');
   const userDataPath = app.getPath('userData');
 
-  console.log("Starting Backend at:", backendPath);
-  console.log("User Data Path:", userDataPath);
-
-  backendProcess = spawn('node', [backendPath, SECRET_TOKEN, userDataPath], {
-    // IMPORTANT: Set cwd to backend folder so it finds 'better-sqlite3' in node_modules
-    cwd: path.join(__dirname, '../'), 
+  // FIXED: Use process.execPath (Electron) instead of 'node'
+  // FIXED: Add ELECTRON_RUN_AS_NODE environment variable
+  backendProcess = spawn(process.execPath, [backendPath, SECRET_TOKEN, userDataPath], {
+    cwd: path.join(__dirname, '../backend'), 
+    env: { 
+      ...process.env, 
+      ELECTRON_RUN_AS_NODE: '1' 
+    },
     stdio: 'inherit'
   });
 
@@ -46,7 +48,6 @@ function startBackend() {
     console.error('Failed to start backend process:', err);
   });
 }
-
 app.whenReady().then(async () => {
   startBackend();
   const mainWindow = createWindow();

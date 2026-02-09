@@ -20,16 +20,16 @@ const IPC_CHANNELS = {
   NOTIFY_PROGRESS: 'notify:progress',
 };
 
-contextBridge.exposeInMainWorld('nativeAPI', { // CHANGED from 'electronAPI' to 'nativeAPI' to match api.js
 
-  // 1. Security: Get Token
+contextBridge.exposeInMainWorld('nativeAPI', {
+  // Security
   getSecretToken: () => ipcRenderer.invoke('get-secret-token'),
-
-  // 2. Native Dialogs
+  
+  // Dialogs
   selectFile: () => ipcRenderer.invoke('dialog:open-file'),
   showSaveDialog: (options) => ipcRenderer.invoke('dialog:save-file', options),
 
-  // 3. Listeners (Optional, if you use them later)
+  // Events
   onProgress: (callback) => ipcRenderer.on(IPC_CHANNELS.NOTIFY_PROGRESS, (_event, value) => callback(value)),
   onNotification: (callback) => ipcRenderer.on(IPC_CHANNELS.NOTIFY_USER, (_event, value) => callback(value)),
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),

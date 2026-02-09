@@ -2,7 +2,7 @@
 const API_URL = 'http://localhost:4000/api';
 let SECRET_TOKEN = null;
 
-export async function initializeApi() {
+/*export async function initializeApi() {
   // Check if nativeAPI exists (it might not if preload failed)
   if (!window.nativeAPI) {
     console.error("CRITICAL: window.nativeAPI is undefined. Preload script failed.");
@@ -16,6 +16,15 @@ export async function initializeApi() {
     } catch (e) {
       console.error("Failed to get secret token:", e);
     }
+  }
+}*/
+
+export async function initializeApi() {
+  // Ensure we look for nativeAPI, not electronAPI
+  if (window.nativeAPI) {
+    SECRET_TOKEN = await window.nativeAPI.getSecretToken();
+  } else {
+    console.error("nativeAPI not found. Preload failed?");
   }
 }
 
