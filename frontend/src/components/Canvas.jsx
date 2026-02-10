@@ -1,50 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Note from './Note';
-import TaskWidget from './TaskWidget';
 import Frame from './Frame';
+import TaskWidget from './TaskWidget';
 
 const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
-    const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
+  const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [isPanning, setIsPanning] = useState(false);
   const containerRef = useRef(null);
 
-  // --- DATA LOADING ---
+  // --- 1. DATA LOADING ---
   const fetchData = async () => {
     try {
+      console.log("Canvas: Fetching data...");
       const token = await window.nativeAPI.getSecretToken();
       const res = await fetch('http://localhost:4000/api/all', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
       setData(json);
+      console.log("Canvas: Data loaded", json);
     } catch (e) { console.error("Canvas Load Error:", e); }
   };
 
-   <button 
-    onClick={triggerAddFrame} // Attach Handler
-    className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md transition-all active:scale-95"
-  >
-    Add Frame
-  </button>
+  useEffect(() => { fetchData(); }, []);
 
-  // --- HANDLERS (Properly Async) ---
-
-  const handleUpdateFrame = async (id, changes) => {
-    // 1. Optimistic Update (Prevents "Reset/Snap back")
-    setData(prev => ({
-        ...prev,
-        frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f)
-    }));
-
-    // 2. API Call
-    const token = await window.nativeAPI.getSecretToken(); // AWAIT THIS!
-    await fetch(`http://localhost:4000/api/frames/${id}`, { // Make sure this route exists in backend
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(changes)
-    });
-  };
+  // --- 2. NOTE HANDLERS (The Missing Functions) ---
 
   const handleUpdateNote = async (id, changes) => {
     setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...changes } : n) }));
@@ -57,6 +38,8 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
   };
 
   const handleDeleteNote = async (id) => {
+    console.log("Canvas: Deleting note", id);
+    // Optimistic delete
     setData(prev => ({ ...prev, notes: prev.notes.filter(n => n.id !== id) }));
     const token = await window.nativeAPI.getSecretToken();
     await fetch(`http://localhost:4000/api/notes/${id}`, { 
@@ -64,97 +47,97 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
     });
   };
 
-  // --- TAG OPERATIONS ---
   const handleTagAction = async (action, type, id, tagName) => {
-      // Optimistic update could go here
+      console.log(`Canvas: Tag Action [${action}] on ${type} ${id}: ${tagName}`);
       const token = await window.nativeAPI.getSecretToken();
-      const method = action === 'add' ? 'POST' : 'DELETE';
       const url = action === 'add' 
         ? `http://localhost:4000/api/tags/${type}/${id}`
         : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
       
+      const method = action === 'add' ? 'POST' : 'DELETE';
+
       await fetch(url, {
           method: method,
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined
       });
-      fetchData(); // Refresh to get tag colors/IDs
+      fetchData(); // Refresh to get updated tags/colors
   };
 
-  // --- CANVAS INTERACTION (ZOOM & PAN) ---
-  const handleWheel = (e) => {
-    // Zoom on Wheel
-    if (e.ctrlKey || e.metaKey || true) { // Always zoom on wheel for now
-        e.preventDefault(); // Prevent browser zoom
-        const zoomSensitivity = 0.001;
-        const delta = -e.deltaY * zoomSensitivity;
-        const newScale = Math.min(Math.max(view.scale + delta, 0.1), 5); // Limit 0.1x to 5x
-        
-        // Zoom towards mouse pointer logic (simplified for now: center zoom)
-        // Ideally: calculate offset based on mouse pos.
-        setView(prev => ({ ...prev, scale: newScale }));
-    }
+  // --- 3. FRAME HANDLERS ---
+
+  const handleUpdateFrame = async (id, changes) => {
+    setData(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/frames/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(changes)
+    });
   };
 
-  const handleMouseDown = (e) => {
-      // Middle click (button 1) or Spacebar held
-      if (e.button === 1 || e.buttons === 4 || (e.button === 0 && e.altKey)) {
-          setIsPanning(true);
-          e.preventDefault();
-      }
-  };
+  // --- 4. ADD FRAME LISTENER (Debugged) ---
+  useEffect(() => {
+    const onAddFrame = async () => {
+        console.log("Canvas: Event 'cognicanvas:add-frame' received!");
+        const token = await window.nativeAPI.getSecretToken();
+        const newFrame = {
+            title: "NEW FRAME",
+            pos_x: (-view.x + 100) / view.scale,
+            pos_y: (-view.y + 100) / view.scale,
+            width: 400, height: 300
+        };
+        const res = await fetch('http://localhost:4000/api/frames', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(newFrame)
+        });
+        if(res.ok) {
+            console.log("Canvas: Frame created successfully");
+            fetchData();
+        } else {
+            console.error("Canvas: Frame creation failed", await res.text());
+        }
+    };
 
-  const handleMouseMove = (e) => {
-      if (isPanning) {
-          setView(prev => ({
-              ...prev,
-              x: prev.x + e.movementX,
-              y: prev.y + e.movementY
-          }));
-      }
-  };
+    window.addEventListener('cognicanvas:add-frame', onAddFrame);
+    return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
+  }, [view]);
 
-  const handleMouseUp = () => setIsPanning(false);
+  // --- 5. RENDER LOGIC ---
+  
+  // Apply Filters
+  const filteredNotes = data.notes.filter(note => {
+      const matchesSearch = !searchQuery || note.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTags = activeFilters.length === 0 || (note.tags && note.tags.some(t => activeFilters.includes(t.name)));
+      return matchesSearch && matchesTags;
+  });
 
-  // Double Click to Add Note
+  // Double Click Note Creation
   const handleDoubleClick = async (e) => {
-    if (e.target !== e.currentTarget) return; // Only click on empty canvas
-    
-    // Math to place note exactly where clicked
+    if (e.target !== e.currentTarget) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    const canvasX = (clickX - view.x) / view.scale;
-    const canvasY = (clickY - view.y) / view.scale;
+    const canvasX = ((e.clientX - rect.left) - view.x) / view.scale;
+    const canvasY = ((e.clientY - rect.top) - view.y) / view.scale;
 
     const token = await window.nativeAPI.getSecretToken();
     const newNote = {
-      content: "New Note",
-      pos_x: canvasX - 100,
-      pos_y: canvasY - 100,
+      content: "New Note", pos_x: canvasX - 100, pos_y: canvasY - 100,
       width: 200, height: 200, color_hex: "#fff000"
     };
 
-    const res = await fetch('http://localhost:4000/api/notes', {
+    await fetch('http://localhost:4000/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify(newNote)
     });
-    const savedNote = await res.json();
-    setData(prev => ({ ...prev, notes: [...prev.notes, savedNote] }));
+    fetchData();
   };
-  // Expose a method for App.jsx to call (Optional, or move addFrame logic to App and pass down)
-  // For now, let's keep it simple: Filter logic
-  const filteredNotes = data.notes.filter(note => {
-      const matchesSearch = note.content.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTags = activeFilters.length === 0 || (note.tags && note.tags.some(t => activeFilters.includes(t.name)));
-      return matchesSearch && matchesTags;
-  });
+
   return (
     <div 
         ref={containerRef}
         className={`w-full h-full overflow-hidden relative bg-[#242424] ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
-        // Note: attach wheel listener via useEffect as discussed previously
         onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) { setIsPanning(true); e.preventDefault(); } }}
         onMouseMove={(e) => { if(isPanning) setView(p => ({...p, x: p.x + e.movementX, y: p.y + e.movementY})); }}
         onMouseUp={() => setIsPanning(false)}
@@ -163,18 +146,16 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
     >
       <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
           
-          {/* GRID */}
           <div className="absolute pointer-events-none opacity-10 top-[-5000px] left-[-5000px] w-[10000px] h-[10000px]"
              style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
           />
 
-          {/* FRAMES */}
           {data.frames.map(frame => (
             <Frame
                 key={frame.id}
                 frame={frame}
                 scale={view.scale}
-                onUpdate={handleUpdateFrame} // FIXED: Uses the async wrapper
+                onUpdate={handleUpdateFrame}
                 onDelete={async (id) => {
                     await fetch(`http://localhost:4000/api/frames/${id}`, { 
                         method: 'DELETE', 
@@ -185,9 +166,7 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
             />
           ))}
 
-          {/* NOTES */}
           {data.notes.map(note => {
-              // Dimming Logic
               const isMatch = filteredNotes.find(n => n.id === note.id);
               const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
               
@@ -198,19 +177,20 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
                     scale={view.scale}
                     isDimmed={isDimmed}
                     onNoteUpdate={handleUpdateNote}
-                    // ... other props
-                    onDataChange={fetchData} 
+                    onNoteDelete={handleDeleteNote} // FIXED: Passed correctly
+                    onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)} // FIXED: Passed correctly
+                    onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)} // FIXED: Passed correctly
+                    onDataChange={fetchData}
+                    onTagClick={onTagClick}
                 />
               );
           })}
 
-          {/* TASKS - Only show if App is active or if you want them always visible */}
           {data.tasks && data.tasks.map(task => (
              <TaskWidget key={task.id} task={task} scale={view.scale} onUpdate={fetchData} />
           ))}
 
       </div>
-      {/* HUD */}
       <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs font-mono">{Math.round(view.scale * 100)}%</div>
     </div>
   );

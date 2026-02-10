@@ -6,29 +6,45 @@ import CryptoApp from './apps/CryptoApp';
 import ShortcutWidget from './components/ShortcutWidget';
 
 function App() {
-  const [openApps, setOpenApps] = useState([]); // Array of strings e.g. ["crypto"]
+  const [openApps, setOpenApps] = useState([]);
   const [isReady, setIsReady] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const triggerAddFrame = () => {
-    // Dispatch event that Canvas listens to
-    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
-  };
+  
+  // Filters
+  const [activeFilters, setActiveFilters] = useState([]); 
+  const [availableTags, setAvailableTags] = useState([]); // For Dropdown
+
   useEffect(() => {
-    initializeApi().then(() => setIsReady(true));
+    initializeApi().then(async () => {
+       setIsReady(true);
+       // Fetch available tags for the dropdown
+       try {
+         const token = await window.nativeAPI.getSecretToken();
+         const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+         const data = await res.json();
+         // Extract unique tags from notes
+         const tags = new Set();
+         data.notes.forEach(n => n.tags.forEach(t => tags.add(t.name)));
+         setAvailableTags(Array.from(tags));
+       } catch(e) { console.error("Tag fetch error", e); }
+    });
   }, []);
 
-  // FIXED: Simplified toggle logic to ensure state triggers re-render
   const toggleApp = (appName) => {
-    setOpenApps(current => {
-      if (current.includes(appName)) {
-        return current.filter(name => name !== appName);
-      } else {
-        return [...current, appName];
-      }
-    });
+    setOpenApps(prev => prev.includes(appName) ? prev.filter(a => a !== appName) : [...prev, appName]);
   };
 
-  if (!isReady) return <div className="bg-[#1a1a1a] h-screen text-yellow-500 flex items-center justify-center font-mono">LOADING_SYSTEM_RESOURCES...</div>;
+  const toggleFilter = (tagName) => {
+    console.log("Toggling filter:", tagName);
+    setActiveFilters(prev => prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]);
+  };
+
+  const triggerAddFrame = () => {
+    console.log("App: Triggering Add Frame...");
+    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
+  };
+
+  if (!isReady) return <div className="bg-[#1a1a1a] h-screen text-yellow-500 flex items-center justify-center font-mono">SYSTEM_BOOT...</div>;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#111] text-gray-100 font-sans select-none">
@@ -36,73 +52,100 @@ function App() {
       {/* SIDEBAR DOCK */}
       <nav className="w-16 bg-black flex flex-col items-center py-4 space-y-4 z-[100] border-r border-white/10">
         <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black text-xl mb-4">C</div>
-        
         <DockIcon label="Cryptor" active={openApps.includes('crypto')} onClick={() => toggleApp('crypto')}>🔒</DockIcon>
         <DockIcon label="Tasks" active={openApps.includes('tasks')} onClick={() => toggleApp('tasks')}>✅</DockIcon>
+        <div className="flex-1" />
         <DockIcon label="Settings" active={openApps.includes('settings')} onClick={() => toggleApp('settings')}>⚙️</DockIcon>
       </nav>
 
-      {/* MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col relative">
         
-        {/* TOP BAR */}
-        <header className="h-12 bg-[#1a1a1a] border-b border-white/5 flex items-center px-4 space-x-4 z-50">
-           <button 
-    onClick={triggerAddFrame} // Attach Handler
-    className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md transition-all active:scale-95"
-  >
-    Add Frame
-  </button>
-          <input 
-            type="text" 
-            placeholder="Search nodes..." 
-            className="flex-1 max-w-xs bg-[#222] border-none rounded px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-blue-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* ENHANCED HEADER */}
+        <header className="h-14 bg-[#f8f9fa] border-b border-gray-300 flex items-center px-4 space-x-4 z-40 shadow-sm text-gray-800">
+          
+          {/* Add Frame Button */}
+          <button 
+            onClick={triggerAddFrame}
+            className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md active:scale-95 transition-all whitespace-nowrap"
+          >
+            + Frame
+          </button>
+          
+          {/* Search Bar */}
+          <div className="w-64 relative">
+            <input 
+              type="text" 
+              placeholder="Search content..." 
+              className="w-full bg-[#e9ecef] border-none rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="h-8 w-px bg-gray-300 mx-2"></div>
+
+          {/* Tag Dropdown & List */}
+          <div className="flex-1 flex items-center space-x-2 overflow-hidden">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tags:</span>
+            
+            {/* Dropdown */}
+            <select 
+                className="bg-white border border-gray-300 text-gray-700 text-xs rounded p-1 outline-none focus:border-blue-500"
+                onChange={(e) => { if(e.target.value) { toggleFilter(e.target.value); e.target.value = ""; } }}
+            >
+                <option value="">+ Add Filter</option>
+                {availableTags.map(tag => (
+                    <option key={tag} value={tag}>{tag}</option>
+                ))}
+            </select>
+
+            {/* Selected Tags List */}
+            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+                {activeFilters.length === 0 && <span className="text-xs text-gray-400 italic">No filters active</span>}
+                
+                {activeFilters.map(tag => (
+                <div 
+                    key={tag}
+                    className="px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-xs font-bold flex items-center whitespace-nowrap"
+                >
+                    {tag} <button className="ml-1 text-blue-400 hover:text-blue-900" onClick={() => toggleFilter(tag)}>×</button>
+                </div>
+                ))}
+            </div>
+
+            {/* Clear All */}
+            {activeFilters.length > 0 && (
+                <button onClick={() => setActiveFilters([])} className="text-xs text-red-500 hover:text-red-700 underline font-bold whitespace-nowrap">
+                    Clear
+                </button>
+            )}
+          </div>
         </header>
 
-        {/* WINDOWS PORTAL LAYER (Always on top of Canvas) */}
-        <div className="absolute inset-0 z-50 pointer-events-none">
-          {openApps.includes('crypto') && (
-            <div className="pointer-events-auto">
-              <WindowFrame title="NASM Cryptor" onClose={() => toggleApp('crypto')} initialPos={{x: 150, y: 100}} width={450}>
-                <CryptoApp />
-              </WindowFrame>
-            </div>
-          )}
-
-          {openApps.includes('settings') && (
-            <div className="pointer-events-auto">
-              <WindowFrame title="System Settings" onClose={() => toggleApp('settings')} initialPos={{x: 250, y: 150}} width={400}>
-                <div className="p-4 space-y-4 text-gray-800">
-                  <h2 className="font-bold border-b pb-2">Appearance</h2>
-                  <p className="text-sm">Canvas Theme: Dark (Default)</p>
-                  <button className="w-full py-2 bg-gray-200 rounded text-xs font-bold">EXPORT DATA (.JSON)</button>
-                </div>
-              </WindowFrame>
-            </div>
-          )}
-        </div>
-
-        {/* CANVAS LAYER (Background) */}
         <div className="flex-1 relative z-10">
-          <Canvas searchQuery={searchQuery} />
+          <Canvas 
+            searchQuery={searchQuery} 
+            activeFilters={activeFilters} 
+            onTagClick={toggleFilter} 
+          />
           
-          {/* DESKTOP WIDGETS */}
-          <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 pointer-events-none">
-            {/* Inside App.jsx render */}
-<ShortcutWidget 
-    shortcut={{ 
-        title: "MPSI Drive", 
-        // CORRECT: Double backslashes for JS string escaping
-        target: "C:\\Users\\aperonylo\\Documents\\MPSI", 
-        type: "url" 
-    }} 
-/>
+          <div className="absolute inset-0 z-50 pointer-events-none">
+            {openApps.includes('crypto') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="NASM Cryptor" onClose={() => toggleApp('crypto')} width={450}>
+                  <CryptoApp />
+                </WindowFrame>
+              </div>
+            )}
+            {openApps.includes('settings') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="Settings" onClose={() => toggleApp('settings')} width={400}>
+                   <div className="p-4 text-gray-800">Settings Placeholder</div>
+                </WindowFrame>
+              </div>
+            )}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -112,7 +155,7 @@ const DockIcon = ({ children, label, onClick, active }) => (
   <button 
     onClick={onClick}
     className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all group relative
-      ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}
+      ${active ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}
     `}
   >
     {children}

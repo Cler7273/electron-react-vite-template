@@ -63,7 +63,7 @@ app.get("/api/all", (req, res) => {
     };
   });
 
-  res.json({ notes, frames, tasks });
+   res.json({ notes, frames, tasks });
 });
 
 app.post("/api/notes", (req, res) => {
@@ -161,4 +161,29 @@ app.post('/api/system/open', async (req, res) => res.json(await systemService.op
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
   dbService.init(USER_DATA_PATH); 
+});
+
+app.put("/api/frames/:id", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
+        // Dynamic update similar to notes
+        const updates = [];
+        const params = [];
+        if (title !== undefined) { updates.push("title = ?"); params.push(title); }
+        if (pos_x !== undefined) { updates.push("pos_x = ?"); params.push(pos_x); }
+        if (pos_y !== undefined) { updates.push("pos_y = ?"); params.push(pos_y); }
+        if (width !== undefined) { updates.push("width = ?"); params.push(width); }
+        if (height !== undefined) { updates.push("height = ?"); params.push(height); }
+        if (is_collapsed !== undefined) { updates.push("is_collapsed = ?"); params.push(is_collapsed); }
+        
+        params.push(req.params.id);
+        
+        db.prepare(`UPDATE frames SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/frames/:id", (req, res) => {
+    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
 });
