@@ -36,7 +36,7 @@ const Frame = ({ frame, onUpdate, onDelete, scale }) => {
         >
             <div 
                 ref={nodeRef} 
-                className="absolute z-10 transition-all duration-200"
+                className="absolute z-10 transition-opacity duration-200"
                 style={{ 
                     width: frame.width, 
                     height: frame.is_collapsed ? 'auto' : frame.height 

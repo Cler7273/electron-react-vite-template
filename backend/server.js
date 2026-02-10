@@ -187,3 +187,13 @@ app.delete("/api/frames/:id", (req, res) => {
     db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
     res.json({ success: true });
 });
+
+// ADD THIS ROUTE:
+app.post("/api/frames", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height } = req.body;
+        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
+        const info = stmt.run(title, pos_x, pos_y, width, height);
+        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});

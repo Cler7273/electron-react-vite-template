@@ -14,20 +14,27 @@ function App() {
   const [activeFilters, setActiveFilters] = useState([]); 
   const [availableTags, setAvailableTags] = useState([]); // For Dropdown
 
-  useEffect(() => {
-    initializeApi().then(async () => {
-       setIsReady(true);
-       // Fetch available tags for the dropdown
-       try {
+  // Update this function to fetch tags
+  const fetchTags = async () => {
+     try {
          const token = await window.nativeAPI.getSecretToken();
          const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
          const data = await res.json();
-         // Extract unique tags from notes
          const tags = new Set();
          data.notes.forEach(n => n.tags.forEach(t => tags.add(t.name)));
          setAvailableTags(Array.from(tags));
-       } catch(e) { console.error("Tag fetch error", e); }
+     } catch(e) { console.error("Tag fetch error", e); }
+  };
+
+  useEffect(() => {
+    initializeApi().then(() => {
+       setIsReady(true);
+       fetchTags(); // Initial fetch
     });
+
+    // FIX TAG SYNC: Listen for updates from Canvas
+    window.addEventListener('cognicanvas:data-updated', fetchTags);
+    return () => window.removeEventListener('cognicanvas:data-updated', fetchTags);
   }, []);
 
   const toggleApp = (appName) => {
@@ -124,10 +131,11 @@ function App() {
 
         <div className="flex-1 relative z-10">
           <Canvas 
-            searchQuery={searchQuery} 
-            activeFilters={activeFilters} 
-            onTagClick={toggleFilter} 
-          />
+        searchQuery={searchQuery} 
+        activeFilters={activeFilters} 
+        onTagClick={toggleFilter}
+        showTasks={openApps.includes('tasks')} // FIX TASKS: Pass visibility prop
+    />
           
           <div className="absolute inset-0 z-50 pointer-events-none">
             {openApps.includes('crypto') && (
