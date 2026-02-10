@@ -30,29 +30,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- SQLITE SETUP ---
+
 const db = new Database("cognicanvas.db");
 db.pragma("foreign_keys = ON");
 
-// 1. UPDATE DATABASE SCHEMA
+// 1. INITIAL SCHEMA
 db.exec(`
-  -- Existing Tables
   CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
   CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
   CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-
-  -- UPDATED: Tasks & Time Logs (Added rating/notes)
-  CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, rating INTEGER DEFAULT 0, session_notes TEXT, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
-
-  -- NEW: Shortcuts System
+  CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
+  CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+  CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
-
-  -- NEW: Settings Store
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 `);
+
+// 2. FORCED MIGRATION (Fixes the "no such column: rating" error)
+const migrate = () => {
+    const columns = db.prepare("PRAGMA table_info(time_logs)").all();
+    const hasRating = columns.some(c => c.name === 'rating');
+    if (!hasRating) {
+        console.log("Migrating time_logs table...");
+        db.exec("ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;");
+        db.exec("ALTER TABLE time_logs ADD COLUMN session_notes TEXT;");
+    }
+    const taskCols = db.prepare("PRAGMA table_info(tasks)").all();
+    if (!taskCols.some(c => c.name === 'color_hex')) {
+        db.exec("ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';");
+    }
+};
+migrate();
+
 
 const getTagsFor = (table, id) => {
   return db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`).all(id);
@@ -94,23 +105,25 @@ app.post("/api/settings", (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
     res.json({ success: true });
 });
-
-
+// --- UPDATE GET /api/all (Include Task Tags) ---
 app.get("/api/all", (req, res) => {
   const notes = db.prepare("SELECT * FROM notes").all().map(n => ({ ...n, tags: getTagsFor("note", n.id) }));
   const frames = db.prepare("SELECT * FROM frames").all().map(f => ({ ...f, tags: getTagsFor("frame", f.id) }));
   
-  // NEW: Fetch tasks and check if they have an active (null end_time) log
+  // Update Task Fetching
   const tasks = db.prepare("SELECT * FROM tasks").all().map(task => {
     const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
+    // NEW: Get Tags for task
+    const tags = getTagsFor("task", task.id); 
     return {
       ...task,
       is_running: !!activeLog,
-      current_session_start: activeLog ? activeLog.start_time : null
+      current_session_start: activeLog ? activeLog.start_time : null,
+      tags: tags // <--- Added
     };
   });
 
-   res.json({ notes, frames, tasks });
+  res.json({ notes, frames, tasks });
 });
 
 app.post("/api/notes", (req, res) => {
@@ -133,11 +146,18 @@ app.delete("/api/notes/:id", (req, res) => {
 
 // --- API ROUTES: TAGS (The fix for your 404) ---
 
-// Route for POST /api/tags/notes/23
+// --- UPDATE TAG ROUTE (Support Tasks) ---
+// Find your existing app.post("/api/tags/:itemType/:itemId"...) and replace it with:
 app.post("/api/tags/:itemType/:itemId", (req, res) => {
-  const { itemType, itemId } = req.params; // itemType="notes"
+  const { itemType, itemId } = req.params; 
   const { name } = req.body;
-  const table = itemType === 'notes' ? 'note' : 'frame';
+  
+  // Map URL param to DB table prefix
+  let table;
+  if (itemType === 'notes') table = 'note';
+  else if (itemType === 'frames') table = 'frame';
+  else if (itemType === 'tasks') table = 'task';
+  else return res.status(400).json({ error: "Invalid item type" });
   
   db.transaction(() => {
     let tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(name);
@@ -150,17 +170,19 @@ app.post("/api/tags/:itemType/:itemId", (req, res) => {
   res.status(201).json({ message: "Tag added" });
 });
 
-// Route for DELETE /api/notes/23/tags/mpsi
 app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
   const { itemType, itemId, tagName } = req.params;
-  const table = itemType === 'notes' ? 'note' : 'frame';
+  let table;
+  if (itemType === 'notes') table = 'note';
+  else if (itemType === 'frames') table = 'frame';
+  else if (itemType === 'tasks') table = 'task';
+  
   const tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(tagName);
   if (tag) {
     db.prepare(`DELETE FROM ${table}_tags WHERE ${table}_id = ? AND tag_id = ?`).run(itemId, tag.id);
   }
   res.json({ message: "Tag removed" });
 });
-
 // Update tag color
 app.put("/api/tags/:name", (req, res) => {
   db.prepare("UPDATE tags SET color_hex = ? WHERE name = ?").run(req.body.color_hex, req.params.name);

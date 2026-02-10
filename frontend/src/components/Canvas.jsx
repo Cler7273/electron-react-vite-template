@@ -3,26 +3,95 @@ import Note from './Note';
 import Frame from './Frame';
 import TaskWidget from './TaskWidget';
 
-const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424'  }) => {
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424' }) => {
   const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
-  const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 });
+  const [forceRender, setForceRender] = useState(0); 
   const [isPanning, setIsPanning] = useState(false);
   const containerRef = useRef(null);
 
-  // --- DATA LOADING ---
+  const setView = (newView) => {
+      viewRef.current = { ...viewRef.current, ...newView };
+      setForceRender(prev => prev + 1);
+  };
+
   const fetchData = async () => {
     try {
       const token = await window.nativeAPI.getSecretToken();
-      const res = await fetch('http://localhost:4000/api/all', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
       const json = await res.json();
       setData(json);
       window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
-    } catch (e) { console.error("Canvas Load Error:", e); }
+    } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    fetchData(); 
+    const container = containerRef.current;
+    if (!container) return;
+
+    // --- FIX: ZOOM ANCHOR (Mouse Centered) ---
+    const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const rect = container.getBoundingClientRect();
+      
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // World coordinates under mouse
+      const worldX = (mouseX - current.x) / current.scale;
+      const worldY = (mouseY - current.y) / current.scale;
+
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+
+      // New offsets to keep world point under mouse
+      const newX = mouseX - (worldX * newScale);
+      const newY = mouseY - (worldY * newScale);
+
+      setView({ x: newX, y: newY, scale: newScale });
+    };
+
+    container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheelNative);
+  }, []);
+
+  // --- FIX: DOUBLE CLICK (Infinite Click Area) ---
+  const handleDoubleClick = async (e) => {
+    // Only trigger if we clicked the actual background (container)
+    // or the empty transform layer
+    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) - viewRef.current.x) / viewRef.current.scale;
+    const y = ((e.clientY - rect.top) - viewRef.current.y) / viewRef.current.scale;
+
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ content: "New Note", pos_x: x - 100, pos_y: y - 100, width: 200, height: 200, color_hex: "#fff000" })
+    });
+    fetchData();
+  };
+
+  const handleNoteUpdateDrag = async (id, changes) => {
+    let updates = { ...changes };
+    if (changes.pos_x !== undefined) {
+        const note = data.notes.find(n => n.id === id);
+        const cx = changes.pos_x + (note.width / 2);
+        const cy = changes.pos_y + (note.height / 2);
+        const parentFrame = data.frames.find(f => !f.is_collapsed && cx >= f.pos_x && cx <= (f.pos_x + f.width) && cy >= f.pos_y && cy <= (f.pos_y + f.height));
+        updates.frame_id = parentFrame ? parentFrame.id : null;
+    }
+    setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/notes/${id}`, { 
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+        body: JSON.stringify(updates) 
+    });
+  };
 
   // --- 1. FRAME MOVING LOGIC (Synchronized) ---
   const handleFrameDrag = (frameId, dx, dy) => {
@@ -182,60 +251,48 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
     return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
   }, [view]);
 
-  return (
+   return (
     <div 
         ref={containerRef}
-        className={`w-full h-full overflow-hidden relative bg-[#242424] ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
-        onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) { setIsPanning(true); e.preventDefault(); } }}
-        onMouseMove={(e) => { if(isPanning) setView(p => ({...p, x: p.x + e.movementX, y: p.y + e.movementY})); }}
+        onDoubleClick={handleDoubleClick}
+        onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) setIsPanning(true); }}
+        onMouseMove={(e) => { if(isPanning) setView({ x: viewRef.current.x + e.movementX, y: viewRef.current.y + e.movementY }); }}
         onMouseUp={() => setIsPanning(false)}
-        onMouseLeave={() => setIsPanning(false)}
-        onDoubleClick={async (e) => {
-            if (e.target !== e.currentTarget) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const token = await window.nativeAPI.getSecretToken();
-            const newNote = {
-                content: "New Note", 
-                pos_x: ((e.clientX - rect.left) - view.x) / view.scale - 100, 
-                pos_y: ((e.clientY - rect.top) - view.y) / view.scale - 100,
-                width: 200, height: 200, color_hex: "#fff000"
-            };
-            await fetch('http://localhost:4000/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newNote) });
-            fetchData();
-        }}
+        className="w-full h-full overflow-hidden relative"
         style={{ backgroundColor: bgColor }}
     >
-      <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
-          
-          <div className="absolute pointer-events-none opacity-10 top-[-5000px] left-[-5000px] w-[10000px] h-[10000px]"
+      <div 
+        id="transform-layer"
+        style={{ 
+            transform: `translate(${viewRef.current.x}px, ${viewRef.current.y}px) scale(${viewRef.current.scale})`, 
+            transformOrigin: '0 0',
+            position: 'absolute',
+            width: 0, height: 0, // FIX: Size 0 ensures children overflow but clicks pass through
+            pointerEvents: 'none' // FIX: Passes clicks to container background
+        }}
+      >
+          {/* GRID: Massive coverage */}
+          <div className="absolute opacity-10 top-[-100000px] left-[-100000px] w-[200000px] h-[200000px] pointer-events-none"
              style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
           />
 
-          {data.frames.map(frame => (
-            <Frame
-                key={frame.id}
-                frame={frame}
-                scale={view.scale}
-                onUpdate={handleUpdateFrame}
-                onDrag={handleFrameDrag} // Pass the synchronized drag handler
-                onDragStop={handleFrameStop} // Pass the saver
-                onDelete={async (id) => {
-                    await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` } });
-                    fetchData();
-                }}
-            />
-          ))}
-
-          {/* RENDER THE COMPUTED LIST OF NOTES */}
-          {notesToRender}
-
-          {showTasks && data.tasks && data.tasks.map(task => (
-             <TaskWidget key={task.id} task={task} scale={view.scale} onUpdate={fetchData} />
-          ))}
-
+          {/* Children: Explicitly enable pointer events */}
+          <div className="pointer-events-auto">
+            {data.frames.map(frame => (
+                <Frame key={frame.id} frame={frame} scale={viewRef.current.scale} onUpdate={fetchData} />
+            ))}
+            {data.notes.map(note => {
+                if (note.frame_id && data.frames.find(f => f.id === note.frame_id)?.is_collapsed) return null;
+                return <Note key={note.id} note={note} scale={viewRef.current.scale} onNoteUpdate={handleNoteUpdateDrag} onDataChange={fetchData} />;
+            })}
+            {showTasks && data.tasks.map(task => (
+                <TaskWidget key={task.id} task={task} scale={viewRef.current.scale} onUpdate={fetchData} />
+            ))}
+          </div>
       </div>
-      <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs font-mono">{Math.round(view.scale * 100)}%</div>
+      <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs font-mono">{Math.round(viewRef.current.scale * 100)}%</div>
     </div>
   );
 };
+
 export default Canvas;
