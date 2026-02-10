@@ -3,6 +3,7 @@ import { initializeApi } from './api';
 import Canvas from './components/Canvas';
 import WindowFrame from './components/WindowFrame';
 import CryptoApp from './apps/CryptoApp';
+import TasksApp from './apps/TasksApp';
 import ShortcutWidget from './components/ShortcutWidget';
 
 function App() {
@@ -152,6 +153,14 @@ function App() {
                 </WindowFrame>
               </div>
             )}
+            {/* TASKS WINDOW - The Fix for "No Action" */}
+{openApps.includes('tasks') && (
+  <div className="pointer-events-auto">
+    <WindowFrame title="Task Manager" onClose={() => toggleApp('tasks')} width={400} initialPos={{x: 500, y: 100}}>
+      <TasksApp />
+    </WindowFrame>
+  </div>
+)}
           </div>
         </div>
       </div>

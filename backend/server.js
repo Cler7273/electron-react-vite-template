@@ -182,7 +182,38 @@ app.put("/api/frames/:id", (req, res) => {
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// --- MPSI TASKS ROUTES (Fix for 404) ---
+app.post("/api/tasks", (req, res) => {
+    try {
+        const { title } = req.body;
+        // Default is_done to 0, total_time_ms to 0
+        const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms) VALUES (?, 0, ?, 0)");
+        const info = stmt.run(title, Date.now());
+        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
+app.post("/api/tasks/:id/start", (req, res) => {
+    try {
+        const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(req.params.id, Date.now());
+        res.json({ logId: info.lastInsertRowid });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post("/api/tasks/:id/stop", (req, res) => {
+    try {
+        const now = Date.now();
+        const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
+        if(log) {
+            db.prepare("UPDATE time_logs SET end_time = ? WHERE id = ?").run(now, log.id);
+            const duration = now - log.start_time;
+            db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(duration, req.params.id);
+            res.json({ success: true, duration });
+        } else {
+            res.status(400).json({ error: "No running timer" });
+        }
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 app.delete("/api/frames/:id", (req, res) => {
     db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
     res.json({ success: true });
