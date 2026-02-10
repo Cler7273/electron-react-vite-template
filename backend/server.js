@@ -34,12 +34,24 @@ app.use((req, res, next) => {
 const db = new Database("cognicanvas.db");
 db.pragma("foreign_keys = ON");
 
+// 1. UPDATE DATABASE SCHEMA
 db.exec(`
-  CREATE TABLE IF NOT EXISTS frames ( id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0 );
-  CREATE TABLE IF NOT EXISTS notes ( id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE );
-  CREATE TABLE IF NOT EXISTS tags ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6' );
-  CREATE TABLE IF NOT EXISTS note_tags ( note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE );
-  CREATE TABLE IF NOT EXISTS frame_tags ( frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE );
+  -- Existing Tables
+  CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
+  CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
+  CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+  CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+
+  -- UPDATED: Tasks & Time Logs (Added rating/notes)
+  CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, rating INTEGER DEFAULT 0, session_notes TEXT, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+
+  -- NEW: Shortcuts System
+  CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
+
+  -- NEW: Settings Store
+  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 `);
 
 const getTagsFor = (table, id) => {
@@ -47,6 +59,41 @@ const getTagsFor = (table, id) => {
 };
 
 // --- API ROUTES: CANVAS ---
+// 2. NEW ROUTES FOR SHORTCUTS
+app.get("/api/shortcuts", (req, res) => {
+    try {
+        const shortcuts = db.prepare("SELECT * FROM shortcuts").all();
+        res.json(shortcuts);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/shortcuts", (req, res) => {
+    try {
+        const { title, target, type } = req.body;
+        const stmt = db.prepare("INSERT INTO shortcuts (title, target, type) VALUES (?, ?, ?)");
+        const info = stmt.run(title, target, type);
+        res.json({ id: info.lastInsertRowid, ...req.body });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/shortcuts/:id", (req, res) => {
+    db.prepare("DELETE FROM shortcuts WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// 3. NEW ROUTES FOR SETTINGS
+app.get("/api/settings", (req, res) => {
+    const rows = db.prepare("SELECT * FROM settings").all();
+    const settings = {};
+    rows.forEach(r => settings[r.key] = r.value);
+    res.json(settings);
+});
+
+app.post("/api/settings", (req, res) => {
+    const { key, value } = req.body;
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+    res.json({ success: true });
+});
 
 
 app.get("/api/all", (req, res) => {
@@ -200,19 +247,22 @@ app.post("/api/tasks/:id/start", (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// 4. UPDATED TASK ROUTES (Stop with Rating)
 app.post("/api/tasks/:id/stop", (req, res) => {
-    try {
-        const now = Date.now();
-        const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
-        if(log) {
-            db.prepare("UPDATE time_logs SET end_time = ? WHERE id = ?").run(now, log.id);
-            const duration = now - log.start_time;
-            db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(duration, req.params.id);
-            res.json({ success: true, duration });
-        } else {
-            res.status(400).json({ error: "No running timer" });
-        }
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    const { rating, notes } = req.body; // New optional params
+    const now = Date.now();
+    const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
+    
+    if(log) {
+        db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ? WHERE id = ?")
+          .run(now, rating || 0, notes || "", log.id);
+        
+        const duration = now - log.start_time;
+        db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(duration, req.params.id);
+        res.json({ success: true, duration });
+    } else {
+        res.status(400).json({ error: "No running timer" });
+    }
 });
 app.delete("/api/frames/:id", (req, res) => {
     db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);

@@ -5,6 +5,8 @@ import WindowFrame from './components/WindowFrame';
 import CryptoApp from './apps/CryptoApp';
 import TasksApp from './apps/TasksApp';
 import ShortcutWidget from './components/ShortcutWidget';
+import SettingsApp from './apps/SettingsApp';
+
 
 function App() {
   const [openApps, setOpenApps] = useState([]);
@@ -51,7 +53,32 @@ function App() {
     console.log("App: Triggering Add Frame...");
     window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
   };
+   const [shortcuts, setShortcuts] = useState([]); // NEW STATE
+  const [theme, setTheme] = useState({ canvas_bg: '#242424' }); // NEW STATE
 
+  const refreshConfig = async () => {
+      const token = await window.nativeAPI.getSecretToken();
+      
+      // Load Shortcuts
+      const sRes = await fetch('http://localhost:4000/api/shortcuts', { headers: { 'Authorization': `Bearer ${token}` } });
+      setShortcuts(await sRes.json());
+
+      // Load Settings
+      const tRes = await fetch('http://localhost:4000/api/settings', { headers: { 'Authorization': `Bearer ${token}` } });
+      const tData = await tRes.json();
+      if (tData.canvas_bg) setTheme({ canvas_bg: tData.canvas_bg });
+  };
+
+  useEffect(() => {
+    initializeApi().then(() => {
+       setIsReady(true);
+       refreshConfig(); // Load initial
+    });
+
+    // Listen for changes from Settings App
+    window.addEventListener('cognicanvas:config-updated', refreshConfig);
+    return () => window.removeEventListener('cognicanvas:config-updated', refreshConfig);
+  }, []);
   if (!isReady) return <div className="bg-[#1a1a1a] h-screen text-yellow-500 flex items-center justify-center font-mono">SYSTEM_BOOT...</div>;
 
   return (
@@ -130,37 +157,33 @@ function App() {
           </div>
         </header>
 
-        <div className="flex-1 relative z-10">
+       <div className="flex-1 relative z-10">
+          {/* PASS THEME COLOR TO CANVAS */}
           <Canvas 
-        searchQuery={searchQuery} 
-        activeFilters={activeFilters} 
-        onTagClick={toggleFilter}
-        showTasks={openApps.includes('tasks')} // FIX TASKS: Pass visibility prop
-    />
+            searchQuery={searchQuery} 
+            activeFilters={activeFilters} 
+            showTasks={openApps.includes('tasks')}
+            bgColor={theme.canvas_bg} 
+          />
           
+          {/* DYNAMIC SHORTCUTS LAYER */}
+          <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 pointer-events-none">
+            {shortcuts.map(s => (
+                <ShortcutWidget key={s.id} shortcut={s} />
+            ))}
+          </div>
+
+          {/* WINDOWS */}
           <div className="absolute inset-0 z-50 pointer-events-none">
-            {openApps.includes('crypto') && (
-              <div className="pointer-events-auto">
-                <WindowFrame title="NASM Cryptor" onClose={() => toggleApp('crypto')} width={450}>
-                  <CryptoApp />
-                </WindowFrame>
-              </div>
-            )}
+            {/* ... other apps ... */}
+            
             {openApps.includes('settings') && (
               <div className="pointer-events-auto">
-                <WindowFrame title="Settings" onClose={() => toggleApp('settings')} width={400}>
-                   <div className="p-4 text-gray-800">Settings Placeholder</div>
+                <WindowFrame title="System Settings" onClose={() => toggleApp('settings')} width={600} initialPos={{x: 200, y: 100}}>
+                  <SettingsApp />
                 </WindowFrame>
               </div>
             )}
-            {/* TASKS WINDOW - The Fix for "No Action" */}
-{openApps.includes('tasks') && (
-  <div className="pointer-events-auto">
-    <WindowFrame title="Task Manager" onClose={() => toggleApp('tasks')} width={400} initialPos={{x: 500, y: 100}}>
-      <TasksApp />
-    </WindowFrame>
-  </div>
-)}
           </div>
         </div>
       </div>

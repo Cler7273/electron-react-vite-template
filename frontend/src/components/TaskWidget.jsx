@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
+import { ResizableBox } from 'react-resizable';
+import "react-resizable/css/styles.css";
 
 const formatTime = (ms) => {
   const s = Math.floor((ms / 1000) % 60);
   const m = Math.floor((ms / 1000 / 60) % 60);
   const h = Math.floor(ms / 1000 / 3600);
-  return `${h}h ${m}m ${s}s`;
+  // Pad with leading zeros for that digital clock look
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
 const TaskWidget = ({ task, onUpdate, scale }) => {
-  // task includes: total_time_ms, is_running, current_session_start
   const [elapsed, setElapsed] = useState(task.total_time_ms || 0);
 
   useEffect(() => {
     let interval;
     if (task.is_running && task.current_session_start) {
-      // Update UI every second without hitting DB
       interval = setInterval(() => {
-        const currentSession = Date.now() - task.current_session_start;
-        setElapsed((task.total_time_ms || 0) + currentSession);
+        setElapsed((task.total_time_ms || 0) + (Date.now() - task.current_session_start));
       }, 1000);
     } else {
       setElapsed(task.total_time_ms || 0);
@@ -26,44 +26,68 @@ const TaskWidget = ({ task, onUpdate, scale }) => {
     return () => clearInterval(interval);
   }, [task.is_running, task.current_session_start, task.total_time_ms]);
 
-  const toggleTimer = async () => {
+  const handleAction = async (action) => {
     const token = await window.nativeAPI.getSecretToken();
-    const action = task.is_running ? 'stop' : 'start';
     
+    // Future: Open a modal here to ask for "Efficiency Rating" when stopping
+    // For now, simple stop.
     await fetch(`http://localhost:4000/api/tasks/${task.id}/${action}`, {
        method: 'POST',
-       headers: { 'Authorization': `Bearer ${token}` }
+       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+       body: JSON.stringify(action === 'stop' ? { rating: 5 } : {}) 
     });
-    
-    // Trigger parent refresh to get new DB state
     onUpdate(); 
   };
 
   return (
-    <Draggable scale={scale} handle=".drag-handle">
-      <div className="absolute z-30 w-64 bg-white rounded-lg shadow-xl border-l-4 border-blue-600 overflow-hidden group">
-        
-        {/* Drag Handle */}
-        <div className="drag-handle h-4 bg-gray-100 cursor-move flex items-center justify-end px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-           <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto"/>
-        </div>
+    <Draggable scale={scale} handle=".task-header">
+      {/* Absolute positioning handled by Canvas */}
+      <div className="absolute z-30 shadow-2xl"> 
+        <ResizableBox 
+            width={250} 
+            height={150} 
+            minConstraints={[200, 120]} 
+            className="bg-gray-900 text-white rounded-xl overflow-hidden border border-gray-700 flex flex-col"
+            handle={<span className="react-resizable-handle react-resizable-handle-se" />}
+        >
+            {/* Header */}
+            <div className="task-header bg-gray-800 p-2 cursor-move flex justify-between items-center select-none">
+                <span className="font-bold text-sm truncate px-1">{task.title}</span>
+                <div className={`w-3 h-3 rounded-full ${task.is_running ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            </div>
 
-        <div className="p-4 pt-1">
-          <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{task.title}</h3>
-          
-          <div className={`font-mono text-3xl text-center my-3 tracking-wider ${task.is_running ? 'text-blue-600 font-bold' : 'text-gray-500'}`}>
-            {formatTime(elapsed)}
-          </div>
+            {/* Content */}
+            <div className="flex-1 flex flex-col items-center justify-center p-2 relative">
+                 {/* Digital Clock Display */}
+                 <div className="font-mono text-4xl font-bold tracking-widest text-blue-400 drop-shadow-md">
+                     {formatTime(elapsed)}
+                 </div>
+                 
+                 {/* Date Stamp (Today) */}
+                 <div className="text-xs text-gray-500 mt-1">
+                     {new Date().toLocaleDateString()}
+                 </div>
 
-          <button 
-            onClick={toggleTimer}
-            className={`w-full py-2 rounded text-white font-bold uppercase tracking-widest text-xs transition-colors
-              ${task.is_running ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}
-            `}
-          >
-            {task.is_running ? 'Stop Timer' : 'Start Timer'}
-          </button>
-        </div>
+                 {/* Controls */}
+                 <div className="absolute bottom-2 w-full px-4 flex gap-2">
+                     {!task.is_running ? (
+                         <button 
+                            onClick={() => handleAction('start')}
+                            className="flex-1 bg-green-600 hover:bg-green-500 text-white py-1 rounded text-xs font-bold uppercase"
+                         >
+                            Start
+                         </button>
+                     ) : (
+                         <button 
+                            onClick={() => handleAction('stop')}
+                            className="flex-1 bg-red-600 hover:bg-red-500 text-white py-1 rounded text-xs font-bold uppercase"
+                         >
+                            Stop
+                         </button>
+                     )}
+                 </div>
+            </div>
+        </ResizableBox>
       </div>
     </Draggable>
   );

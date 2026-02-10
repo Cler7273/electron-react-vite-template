@@ -3,7 +3,7 @@ import Note from './Note';
 import Frame from './Frame';
 import TaskWidget from './TaskWidget';
 
-const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks }) => {
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424'  }) => {
   const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [isPanning, setIsPanning] = useState(false);
@@ -203,6 +203,7 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks })
             await fetch('http://localhost:4000/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newNote) });
             fetchData();
         }}
+        style={{ backgroundColor: bgColor }}
     >
       <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
           
