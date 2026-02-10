@@ -48,10 +48,22 @@ const getTagsFor = (table, id) => {
 
 // --- API ROUTES: CANVAS ---
 
+
 app.get("/api/all", (req, res) => {
   const notes = db.prepare("SELECT * FROM notes").all().map(n => ({ ...n, tags: getTagsFor("note", n.id) }));
   const frames = db.prepare("SELECT * FROM frames").all().map(f => ({ ...f, tags: getTagsFor("frame", f.id) }));
-  res.json({ notes, frames });
+  
+  // NEW: Fetch tasks and check if they have an active (null end_time) log
+  const tasks = db.prepare("SELECT * FROM tasks").all().map(task => {
+    const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
+    return {
+      ...task,
+      is_running: !!activeLog,
+      current_session_start: activeLog ? activeLog.start_time : null
+    };
+  });
+
+  res.json({ notes, frames, tasks });
 });
 
 app.post("/api/notes", (req, res) => {

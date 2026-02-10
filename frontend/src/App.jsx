@@ -9,7 +9,10 @@ function App() {
   const [openApps, setOpenApps] = useState([]); // Array of strings e.g. ["crypto"]
   const [isReady, setIsReady] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
+  const triggerAddFrame = () => {
+    // Dispatch event that Canvas listens to
+    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
+  };
   useEffect(() => {
     initializeApi().then(() => setIsReady(true));
   }, []);
@@ -44,7 +47,12 @@ function App() {
         
         {/* TOP BAR */}
         <header className="h-12 bg-[#1a1a1a] border-b border-white/5 flex items-center px-4 space-x-4 z-50">
-          <button className="bg-blue-600 px-3 py-1 rounded text-xs font-bold hover:bg-blue-500 transition-colors">ADD FRAME</button>
+           <button 
+    onClick={triggerAddFrame} // Attach Handler
+    className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md transition-all active:scale-95"
+  >
+    Add Frame
+  </button>
           <input 
             type="text" 
             placeholder="Search nodes..." 
