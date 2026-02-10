@@ -15,11 +15,15 @@ const parseAndRenderLinks = (htmlContent) => {
     });
 };
 
-const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, scale }) => {
+const Note = ({ note, isDimmed, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, scale }) => {
     const nodeRef = useRef(null);
     const contentRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
-
+    // DYNAMIC STYLE: Add opacity-30 and grayscale if dimmed
+    // We also disable pointer-events so you can't click/edit dimmed notes (optional, remove if unwanted)
+    const dimmingClass = isDimmed 
+        ? "opacity-30 grayscale pointer-events-none transition-all duration-500 ease-in-out" 
+        : "opacity-100 transition-all duration-300 ease-in-out";
     // --- DRAG HANDLERS ---
     const handleDragStart = () => setIsDragging(true);
     const handleDragStop = (e, data) => {
@@ -95,12 +99,13 @@ const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataC
             onStart={handleDragStart}
             onStop={handleDragStop}
             position={{ x: note.pos_x, y: note.pos_y }}
-            scale={scale} // CRITICAL: Scale must be passed for drag to track mouse correctly
+            scale={scale}
+            disabled={isDimmed} // Disable dragging if dimmed
         >
             <div 
                 id={`note-${note.id}`} 
                 ref={nodeRef} 
-                className={noteClasses} 
+                className={`absolute z-20 shadow-xl ${dimmingClass}`} // Apply class here
                 style={{ width: note.width, height: note.height }}
             >
                 <ResizableBox 

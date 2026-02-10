@@ -5,7 +5,7 @@ const { dialog } = require('electron');
 const { processBuffer } = require('./nasm-engine');
 
 class FileService {
-  async encryptFile(filePath, keyConfig, intensity, onProgress, onNotify) {
+  async encryptFile(filePath, keyConfig, intensity, savePath = null, onProgress = () => {}, onNotify = () => {}) {
     try {
       onProgress(0);
       onNotify({ title: 'Encryption', body: `Reading file ${path.basename(filePath)}...` });
@@ -14,18 +14,23 @@ class FileService {
       onNotify({ title: 'Encryption', body: `Encrypting... This may take a while.` });
       const encryptedBuffer = processBuffer(sourceBuffer, keyConfig, intensity, (p) => onProgress(p));
       
-      const { canceled, filePath: savePath } = await dialog.showSaveDialog({
-        defaultPath: `${filePath}.nasm`,
-      });
+      let finalSavePath = savePath;
+      if (!finalSavePath) {
+        const { canceled, filePath: chosenPath } = await dialog.showSaveDialog({
+          defaultPath: `${filePath}.nasm`,
+        });
 
-      if (canceled || !savePath) {
-        onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
-        return { success: false, error: 'Cancelled by user.' };
+        if (canceled || !chosenPath) {
+          onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
+          return { success: false, error: 'Cancelled by user.' };
+        }
+
+        finalSavePath = chosenPath;
       }
 
-      await fs.writeFile(savePath, encryptedBuffer);
-      onNotify({ title: 'Success', body: `File successfully encrypted to ${path.basename(savePath)}` });
-      return { success: true, path: savePath };
+      await fs.writeFile(finalSavePath, encryptedBuffer);
+      onNotify({ title: 'Success', body: `File successfully encrypted to ${path.basename(finalSavePath)}` });
+      return { success: true, path: finalSavePath };
 
     } catch (error) {
       console.error('Encryption failed:', error);
@@ -34,7 +39,7 @@ class FileService {
     }
   }
 
-  async decryptFile(filePath, keyConfig, onProgress, onNotify) {
+  async decryptFile(filePath, keyConfig, savePath = null, onProgress = () => {}, onNotify = () => {}) {
     // Similar structure to encryptFile, but calls processBuffer and suggests a decrypted filename.
     try {
       onProgress(0);
@@ -45,18 +50,23 @@ class FileService {
       const decryptedBuffer = processBuffer(sourceBuffer, keyConfig, 1, (p) => onProgress(p)); // Intensity is 1 for decryption
 
       const originalName = filePath.endsWith('.nasm') ? filePath.slice(0, -5) : `${filePath}.decrypted`;
-      const { canceled, filePath: savePath } = await dialog.showSaveDialog({
-        defaultPath: originalName,
-      });
+      let finalSavePath = savePath;
+      if (!finalSavePath) {
+        const { canceled, filePath: chosenPath } = await dialog.showSaveDialog({
+          defaultPath: originalName,
+        });
 
-      if (canceled || !savePath) {
-        onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
-        return { success: false, error: 'Cancelled by user.' };
+        if (canceled || !chosenPath) {
+          onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
+          return { success: false, error: 'Cancelled by user.' };
+        }
+
+        finalSavePath = chosenPath;
       }
 
-      await fs.writeFile(savePath, decryptedBuffer);
-      onNotify({ title: 'Success', body: `File successfully decrypted to ${path.basename(savePath)}` });
-      return { success: true, path: savePath };
+      await fs.writeFile(finalSavePath, decryptedBuffer);
+      onNotify({ title: 'Success', body: `File successfully decrypted to ${path.basename(finalSavePath)}` });
+      return { success: true, path: finalSavePath };
 
     } catch (error) {
       console.error('Decryption failed:', error);

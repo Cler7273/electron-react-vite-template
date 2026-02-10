@@ -10,20 +10,26 @@ class SystemService {
     const platform = os.platform();
     let command;
     
-    // Determine the command based on OS
+    // NORMALIZE PATH: Fix mixed slashes for Windows
+    const safeTarget = path.normalize(target);
+
     if (platform === 'win32') {
-      command = `start "" "${target}"`;
+      // WINDOWS FIX: 
+      // 1. "start" needs a dummy title argument ("") before the path.
+      // 2. We wrap the path in quotes to handle spaces.
+      command = `start "" "${safeTarget}"`;
     } else if (platform === 'darwin') {
-      command = `open "${target}"`;
+      command = `open "${safeTarget}"`;
     } else {
-      command = `xdg-open "${target}"`;
+      command = `xdg-open "${safeTarget}"`;
     }
 
-    return new Promise((resolve, reject) => {
+    console.log(`[System] Executing: ${command}`); // Debug log
+
+    return new Promise((resolve) => {
       exec(command, (error) => {
         if (error) {
-            console.error(`Exec error: ${error}`);
-            // Don't reject, sometimes 'start' returns distinct codes
+            console.error(`[System] Exec error: ${error.message}`);
             resolve({ success: false, error: error.message });
         } else {
             resolve({ success: true });

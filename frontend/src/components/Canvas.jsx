@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Note from './Note';
 
-const Canvas = () => {
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick }) => {
   const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
   // Viewport State: x/y translation and scale
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
@@ -157,46 +157,50 @@ const Canvas = () => {
     <div 
       ref={containerRef}
       className={`w-full h-full overflow-hidden relative bg-[#242424] ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
-      //onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onDoubleClick={handleDoubleClick}
     >
-      {/* Transformation Layer */}
-      <div 
-        style={{ 
-            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-            transformOrigin: '0 0',
-            width: '100%',
-            height: '100%',
-            position: 'absolute'
-        }}
-      >
-          {/* Grid Background (Moves with transformation) */}
-          <div className="absolute top-[-10000px] left-[-10000px] w-[20000px] h-[20000px] pointer-events-none opacity-20"
-             style={{ 
-                 backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', 
-                 backgroundSize: '40px 40px' 
-             }} 
+      <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
+          
+          {/* GRID BACKGROUND */}
+          <div className="absolute top-[-5000px] left-[-5000px] w-[10000px] h-[10000px] pointer-events-none opacity-10"
+             style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
           />
 
-          {data.notes.map(note => (
-            <Note 
-              key={note.id} 
-              note={note} 
-              scale={view.scale} // Pass scale to draggable
-              onNoteUpdate={handleUpdateNote}
-              onNoteDelete={handleDeleteNote}
-              onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
-              onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
-              onDataChange={fetchData}
-              onNavigateTo={(link) => console.log("Nav to", link)}
-            />
-          ))}
-      </div>
+          {/* RENDER NOTES with Visual Filtering */}
+          {data.notes.map(note => {
+            // 1. Calculate Match
+            const normContent = (note.content || "").toLowerCase();
+            const normSearch = searchQuery.toLowerCase();
+            const matchesSearch = normContent.includes(normSearch);
+            
+            const matchesTags = activeFilters.length === 0 || 
+              (note.tags && note.tags.some(tag => activeFilters.includes(tag.name)));
 
+            // 2. Determine State
+            const isMatch = matchesSearch && matchesTags;
+            // If there is a search active, dim non-matches. If no search, everyone is bright.
+            const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
+
+            return (
+              <Note 
+                key={note.id} 
+                note={note} 
+                scale={view.scale}
+                isDimmed={isDimmed} // <--- PASS THIS PROP
+                onNoteUpdate={handleUpdateNote}
+                onNoteDelete={handleDeleteNote}
+                onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
+                onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
+                onDataChange={fetchData}
+                onTagClick={onTagClick} 
+              />
+            );
+          })}
+      </div>
       {/* HUD: Zoom Indicator */}
       <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-xs font-mono select-none">
           {Math.round(view.scale * 100)}%

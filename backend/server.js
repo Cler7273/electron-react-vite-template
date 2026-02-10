@@ -108,11 +108,42 @@ app.put("/api/tags/:name", (req, res) => {
   res.json({ success: true });
 });
 
-// --- API ROUTES: CRYPTO & SYSTEM ---
-app.get('/api/keys', async (req, res) => res.json(await dbService.getKeys()));
-app.post('/api/keys', async (req, res) => res.json(await dbService.saveKey(req.body)));
-app.post('/api/encrypt', async (req, res) => res.json(await fileService.encryptFile(req.body.filePath, req.body.keyConfig, req.body.intensity, req.body.savePath, () => {}, () => {})));
-app.post('/api/decrypt', async (req, res) => res.json(await fileService.decryptFile(req.body.filePath, req.body.keyConfig, req.body.savePath, () => {}, () => {})));
+// --- FIXED KEY ROUTES ---
+app.get('/api/keys', async (req, res) => {
+  try {
+    const keys = await dbService.getKeys();
+    res.json(keys || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/keys', async (req, res) => {
+  try {
+    // Ensure we handle both creation and updates
+    const result = await dbService.saveKey(req.body);
+    res.json({ success: true, result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/keys/:id', async (req, res) => {
+  try {
+    await dbService.deleteKey(req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- FIXED CRYPTO ROUTES ---
+app.post('/api/encrypt', async (req, res) => {
+  const { filePath, keyConfig, intensity, savePath } = req.body;
+  // Passing empty functions as fallback progress/notify handlers
+  const result = await fileService.encryptFile(filePath, keyConfig, intensity, savePath, () => {}, () => {});
+  res.json(result);
+});
+
+app.post('/api/decrypt', async (req, res) => {
+  const { filePath, keyConfig, savePath } = req.body;
+  const result = await fileService.decryptFile(filePath, keyConfig, savePath, () => {}, () => {});
+  res.json(result);
+});
 app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
 
 app.listen(PORT, '127.0.0.1', () => {

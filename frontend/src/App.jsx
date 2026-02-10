@@ -83,7 +83,15 @@ function App() {
           
           {/* DESKTOP WIDGETS */}
           <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 pointer-events-none">
-            <ShortcutWidget shortcut={{ title: "MPSI Drive", target: "C:\\", type: "url" }} />
+            {/* Inside App.jsx render */}
+<ShortcutWidget 
+    shortcut={{ 
+        title: "MPSI Drive", 
+        // CORRECT: Double backslashes for JS string escaping
+        target: "C:\\Users\\aperonylo\\Documents\\MPSI", 
+        type: "url" 
+    }} 
+/>
           </div>
         </div>
 
