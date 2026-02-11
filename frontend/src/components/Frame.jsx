@@ -85,7 +85,15 @@ const Frame = ({ frame, onUpdate, onDelete, onDrag, onDragStop, scale }) => {
                                 {frame.title}
                             </div>
 
-                            <button onClick={() => onDelete(frame.id)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2">
+                            <button 
+                                onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    e.stopPropagation(); // <--- THIS FIXES THE CONFLICT
+                                    onDelete(frame.id); 
+                                }} 
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2"
+                                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start on button
+                            >
                                 ×
                             </button>
                         </div>

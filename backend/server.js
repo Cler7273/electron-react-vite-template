@@ -1,4 +1,3 @@
-// backend/server.js
 const express = require('express');
 const cors = require('cors');
 const Database = require('better-sqlite3');
@@ -30,47 +29,87 @@ app.use((req, res, next) => {
   next();
 });
 
-
 const db = new Database("cognicanvas.db");
 db.pragma("foreign_keys = ON");
 
-// 1. INITIAL SCHEMA
-db.exec(`
-  CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
-  CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
-  CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
-  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-`);
+// --- ROBUST MIGRATION SYSTEM ---
+const MIGRATIONS = [
+    {
+        version: 1,
+        up: `
+            CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
+            CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
+            CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
+            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+        `
+    },
+    {
+        version: 2,
+        up: `
+            ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;
+            ALTER TABLE time_logs ADD COLUMN session_notes TEXT;
+        `
+    },
+    {
+        version: 3,
+        up: `
+            ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';
+        `
+    }
+];
 
-// 2. FORCED MIGRATION (Fixes the "no such column: rating" error)
-const migrate = () => {
-    const columns = db.prepare("PRAGMA table_info(time_logs)").all();
-    const hasRating = columns.some(c => c.name === 'rating');
-    if (!hasRating) {
-        console.log("Migrating time_logs table...");
-        db.exec("ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;");
-        db.exec("ALTER TABLE time_logs ADD COLUMN session_notes TEXT;");
-    }
-    const taskCols = db.prepare("PRAGMA table_info(tasks)").all();
-    if (!taskCols.some(c => c.name === 'color_hex')) {
-        db.exec("ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';");
-    }
+const runMigrations = () => {
+    // 1. Initialize Version Table
+    db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER DEFAULT 0)`);
+    const result = db.prepare("SELECT version FROM schema_version").get();
+    let currentVersion = result ? result.version : 0;
+
+    if (!result) db.prepare("INSERT INTO schema_version (version) VALUES (0)").run();
+
+    console.log(`[DB] Current Schema Version: ${currentVersion}`);
+
+    // 2. Apply Missing Migrations
+    db.transaction(() => {
+        for (const migration of MIGRATIONS) {
+            if (migration.version > currentVersion) {
+                console.log(`[DB] Applying migration v${migration.version}...`);
+                try {
+                    // Check if columns exist before altering (defensive coding for dev envs)
+                    if (migration.version === 2) {
+                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
+                        if (!cols.some(c => c.name === 'rating')) db.exec(migration.up);
+                    } else if (migration.version === 3) {
+                        const cols = db.prepare("PRAGMA table_info(tasks)").all();
+                        if (!cols.some(c => c.name === 'color_hex')) db.exec(migration.up);
+                    } else {
+                        db.exec(migration.up);
+                    }
+                } catch (e) {
+                    // Ignore "duplicate column" errors if manual hotfixes were applied previously
+                    if (!e.message.includes('duplicate column')) throw e;
+                }
+                currentVersion = migration.version;
+            }
+        }
+        db.prepare("UPDATE schema_version SET version = ?").run(currentVersion);
+    })();
+    console.log(`[DB] Database is up to date (v${currentVersion}).`);
 };
-migrate();
 
+runMigrations();
 
+// --- HELPERS ---
 const getTagsFor = (table, id) => {
   return db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`).all(id);
 };
 
 // --- API ROUTES: CANVAS ---
-// 2. NEW ROUTES FOR SHORTCUTS
 app.get("/api/shortcuts", (req, res) => {
     try {
         const shortcuts = db.prepare("SELECT * FROM shortcuts").all();
@@ -92,7 +131,6 @@ app.delete("/api/shortcuts/:id", (req, res) => {
     res.json({ success: true });
 });
 
-// 3. NEW ROUTES FOR SETTINGS
 app.get("/api/settings", (req, res) => {
     const rows = db.prepare("SELECT * FROM settings").all();
     const settings = {};
@@ -105,21 +143,19 @@ app.post("/api/settings", (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
     res.json({ success: true });
 });
-// --- UPDATE GET /api/all (Include Task Tags) ---
+
 app.get("/api/all", (req, res) => {
   const notes = db.prepare("SELECT * FROM notes").all().map(n => ({ ...n, tags: getTagsFor("note", n.id) }));
   const frames = db.prepare("SELECT * FROM frames").all().map(f => ({ ...f, tags: getTagsFor("frame", f.id) }));
   
-  // Update Task Fetching
   const tasks = db.prepare("SELECT * FROM tasks").all().map(task => {
     const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
-    // NEW: Get Tags for task
     const tags = getTagsFor("task", task.id); 
     return {
       ...task,
       is_running: !!activeLog,
       current_session_start: activeLog ? activeLog.start_time : null,
-      tags: tags // <--- Added
+      tags: tags 
     };
   });
 
@@ -131,28 +167,50 @@ app.post("/api/notes", (req, res) => {
   const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
   res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
 });
-
+// --- REPLACE THE EXISTING app.put("/api/notes/:id") WITH THIS ROBUST VERSION ---
 app.put("/api/notes/:id", (req, res) => {
-  const { content, pos_x, pos_y, width, height, color_hex } = req.body;
-  db.prepare("UPDATE notes SET content = COALESCE(?, content), pos_x = COALESCE(?, pos_x), pos_y = COALESCE(?, pos_y), width = COALESCE(?, width), height = COALESCE(?, height), color_hex = COALESCE(?, color_hex) WHERE id = ?")
-    .run(content, pos_x, pos_y, width, height, color_hex, req.params.id);
-  res.json({ success: true });
-});
+  try {
+      const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
+      
+      // Safety Check: Ensure note exists before trying to read it
+      const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
+      if (!existing) {
+          return res.status(404).json({ error: "Note not found (might have been deleted)" });
+      }
 
+      // If frame_id is explicitly undefined, keep existing. If null/number, use it.
+      // If we are moving (pos_x changed), we might be auto-updating frame_id.
+      // If frame_id is undefined in body, use existing.frame_id
+      const finalFrameId = frame_id === undefined ? existing.frame_id : frame_id;
+
+      const stmt = db.prepare(`
+        UPDATE notes SET 
+        content = COALESCE(?, content), 
+        pos_x = COALESCE(?, pos_x), 
+        pos_y = COALESCE(?, pos_y), 
+        width = COALESCE(?, width), 
+        height = COALESCE(?, height), 
+        color_hex = COALESCE(?, color_hex),
+        frame_id = ?
+        WHERE id = ?`);
+        
+      stmt.run(content, pos_x, pos_y, width, height, color_hex, finalFrameId, req.params.id);
+      res.json({ success: true });
+  } catch (error) {
+      console.error("Update Note Error:", error);
+      res.status(500).json({ error: error.message });
+  }
+});
 app.delete("/api/notes/:id", (req, res) => {
   db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
   res.json({ success: true });
 });
 
-// --- API ROUTES: TAGS (The fix for your 404) ---
-
-// --- UPDATE TAG ROUTE (Support Tasks) ---
-// Find your existing app.post("/api/tags/:itemType/:itemId"...) and replace it with:
+// --- TAGS ---
 app.post("/api/tags/:itemType/:itemId", (req, res) => {
   const { itemType, itemId } = req.params; 
   const { name } = req.body;
   
-  // Map URL param to DB table prefix
   let table;
   if (itemType === 'notes') table = 'note';
   else if (itemType === 'frames') table = 'frame';
@@ -183,39 +241,30 @@ app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
   }
   res.json({ message: "Tag removed" });
 });
-// Update tag color
+
 app.put("/api/tags/:name", (req, res) => {
   db.prepare("UPDATE tags SET color_hex = ? WHERE name = ?").run(req.body.color_hex, req.params.name);
   res.json({ success: true });
 });
 
-// --- FIXED KEY ROUTES ---
+// --- KEYS & CRYPTO ---
 app.get('/api/keys', async (req, res) => {
-  try {
-    const keys = await dbService.getKeys();
-    res.json(keys || []);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { res.json(await dbService.getKeys() || []); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/keys', async (req, res) => {
-  try {
-    // Ensure we handle both creation and updates
-    const result = await dbService.saveKey(req.body);
-    res.json({ success: true, result });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { res.json({ success: true, result: await dbService.saveKey(req.body) }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/keys/:id', async (req, res) => {
-  try {
-    await dbService.deleteKey(req.params.id);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { await dbService.deleteKey(req.params.id); res.json({ success: true }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- FIXED CRYPTO ROUTES ---
 app.post('/api/encrypt', async (req, res) => {
   const { filePath, keyConfig, intensity, savePath } = req.body;
-  // Passing empty functions as fallback progress/notify handlers
   const result = await fileService.encryptFile(filePath, keyConfig, intensity, savePath, () => {}, () => {});
   res.json(result);
 });
@@ -225,17 +274,24 @@ app.post('/api/decrypt', async (req, res) => {
   const result = await fileService.decryptFile(filePath, keyConfig, savePath, () => {}, () => {});
   res.json(result);
 });
-app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
-  dbService.init(USER_DATA_PATH); 
+// --- SYSTEM ---
+app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
+app.post('/api/system/run', async (req, res) => res.json(await systemService.runCommand(req.body.command, req.body.args)));
+
+// --- FRAMES ---
+app.post("/api/frames", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height } = req.body;
+        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
+        const info = stmt.run(title, pos_x, pos_y, width, height);
+        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.put("/api/frames/:id", (req, res) => {
     try {
         const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
-        // Dynamic update similar to notes
         const updates = [];
         const params = [];
         if (title !== undefined) { updates.push("title = ?"); params.push(title); }
@@ -251,11 +307,16 @@ app.put("/api/frames/:id", (req, res) => {
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-// --- MPSI TASKS ROUTES (Fix for 404) ---
+
+app.delete("/api/frames/:id", (req, res) => {
+    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// --- TASKS ---
 app.post("/api/tasks", (req, res) => {
     try {
         const { title } = req.body;
-        // Default is_done to 0, total_time_ms to 0
         const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms) VALUES (?, 0, ?, 0)");
         const info = stmt.run(title, Date.now());
         res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
@@ -269,9 +330,8 @@ app.post("/api/tasks/:id/start", (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 4. UPDATED TASK ROUTES (Stop with Rating)
 app.post("/api/tasks/:id/stop", (req, res) => {
-    const { rating, notes } = req.body; // New optional params
+    const { rating, notes } = req.body; 
     const now = Date.now();
     const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
     
@@ -286,17 +346,22 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         res.status(400).json({ error: "No running timer" });
     }
 });
-app.delete("/api/frames/:id", (req, res) => {
-    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+// --- ADD THIS NEW ROUTE FOR TASK HISTORY ---
+app.get("/api/history", (req, res) => {
+    try {
+        const logs = db.prepare(`
+            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, t.title as task_title, t.color_hex 
+            FROM time_logs l 
+            JOIN tasks t ON l.task_id = t.id 
+            WHERE l.end_time IS NOT NULL 
+            ORDER BY l.start_time DESC 
+            LIMIT 50
+        `).all();
+        res.json(logs);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ADD THIS ROUTE:
-app.post("/api/frames", (req, res) => {
-    try {
-        const { title, pos_x, pos_y, width, height } = req.body;
-        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
-        const info = stmt.run(title, pos_x, pos_y, width, height);
-        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
-    } catch (error) { res.status(500).json({ error: error.message }); }
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
+  dbService.init(USER_DATA_PATH); 
 });
