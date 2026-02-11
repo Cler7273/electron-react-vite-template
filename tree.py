@@ -22,7 +22,7 @@ DIR_BLACKLIST = {
 
 # Files to exclude (optional, strictly exact match)
 FILE_BLACKLIST = {
-    
+    'react.svg','electron.svg',"vite.svg"
 }
 
 # UTF-8 Box Drawing Characters

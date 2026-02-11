@@ -14,7 +14,7 @@ def generate_project_output():
     blacklist_files = {
         output_filename, 
         os.path.basename(__file__), # Ignored the script itself
-        '.DS_Store', 'package-lock.json', 'yarn.lock'
+        '.DS_Store', 'package-lock.json', 'yarn.lock','react.svg','electron.svg',"vite.svg","README.md","tree.py","project2txt.py","TODO"
     }
     
     # File extensions to ignore (binary files, images, etc.)
