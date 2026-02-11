@@ -74,3 +74,33 @@ Understood. I have integrated the new crash report into the master list. Here is
 
 **Which specific problem should we tackle first?** 
 *(I recommend starting with **A1** and **A2** to stop the app from crashing, or **D1** to build the foundation for theme customization).*
+
+
+
+
+
+AFTER SOME IMPROVEMENTS, WE ARE NOW HERE
+
+# CogniCanvas: Project Status & Handover
+
+## Critical Fixes Deployed
+1.  **HUD Restoration:** Task Widgets are now rendered in Screen Space (HUD), meaning they stay fixed on your screen while you zoom/pan the canvas.
+2.  **HTML Interpretation:** Notes now correctly display bold, italics, and custom links (`[[note:id]]`) without displaying raw HTML tags. The saving logic has been strictly scoped to avoid double-encoding.
+3.  **Task Calendar:** A detailed "Day View" has been added. Clicking a square on the heatmap reveals the exact tasks and durations for that day.
+4.  **Crash Fixes:** Removed the infinite loop in `TaskWidget` and the `useRef` crash.
+
+## Known Omissions & Technical Debt
+*   **Window Dragging:** The `App.jsx` uses a simplified window rendering logic. The Z-Index management (bringing a clicked window to front) is basic.
+*   **Task Deletion:** I implemented a "Hide" logic for task termination in the widget. A true `DELETE /api/tasks/:id` endpoint in `server.js` was added in the previous step but ensure it is robust (cascading deletes for time logs).
+*   **Performance:** `Canvas.jsx` re-renders frequently on zoom/pan. For large datasets (>100 notes), migrate the `view` state to a Ref-based loop (requestAnimationFrame) to decouple React renders from 60fps canvas updates.
+
+## Roadmap for Next Developer
+1.  **Mobile Companion App:** Build a simple React Native app that connects to the same IP (P2P logic from `p2p-service.js` is the foundation).
+2.  **Search Regex UI:** The backend supports Regex, but the Frontend search bar needs a "Toggle Regex" button to switch between plain text and regex modes.
+3.  **Encrypted Sync:** The `nasm-engine.js` is powerful. Use it to encrypt the entire SQLite DB file before syncing to cloud (Google Drive/Dropbox API).
+
+## Debugging
+*   **Notes:** Check console for `[Note X Debug]` to see exactly what HTML is being saved vs rendered.
+*   **Tasks:** If tasks don't appear in HUD, verify `showTasks` prop in `Canvas.jsx` is true.
+
+THIS STATE IS COMPLEMENTARY AND DOESN'T OVERHAUL THE PREVIOUS UPGRADES TO BE DONE

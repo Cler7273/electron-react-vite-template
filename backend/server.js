@@ -30,6 +30,12 @@ app.use((req, res, next) => {
 });
 
 const db = new Database("cognicanvas.db");
+// --- NEW: Register Regex Function ---
+db.function('regexp', (pattern, str) => {
+    try {
+        return new RegExp(pattern, 'i').test(str) ? 1 : 0;
+    } catch (e) { return 0; }
+});
 db.pragma("foreign_keys = ON");
 
 // --- ROBUST MIGRATION SYSTEM ---
@@ -166,6 +172,36 @@ app.post("/api/notes", (req, res) => {
   const { content, pos_x, pos_y, width, height, color_hex } = req.body;
   const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
   res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
+});
+app.get("/api/search", (req, res) => {
+    try {
+        const query = req.query.q;
+        if (!query) return res.status(200).json({ noteIds: [], frameIds: [] });
+        
+        // Use REGEXP for power users, fallback to LIKE logic handled by the custom function if simple text
+        // The custom function handles the regex logic.
+        const noteIds = db
+            .prepare(`SELECT id FROM notes WHERE content REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        const frameIds = db
+            .prepare(`SELECT id FROM frames WHERE title REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        res.status(200).json({ noteIds, frameIds });
+    } catch (error) {
+        // Fallback for invalid regex syntax to normal substring search
+        try {
+             const fallbackQuery = `%${query}%`;
+             const noteIds = db.prepare(`SELECT id FROM notes WHERE content LIKE ?`).all(fallbackQuery).map(r => r.id);
+             const frameIds = db.prepare(`SELECT id FROM frames WHERE title LIKE ?`).all(fallbackQuery).map(r => r.id);
+             res.status(200).json({ noteIds, frameIds });
+        } catch(e) {
+             res.status(500).json({ error: error.message });
+        }
+    }
 });
 // --- REPLACE THE EXISTING app.put("/api/notes/:id") WITH THIS ROBUST VERSION ---
 app.put("/api/notes/:id", (req, res) => {
@@ -322,7 +358,15 @@ app.post("/api/tasks", (req, res) => {
         res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
-
+app.put("/api/tasks/:id", (req, res) => {
+    try {
+        const { color_hex, title } = req.body;
+        // Allow updating color and title
+        db.prepare("UPDATE tasks SET color_hex = COALESCE(?, color_hex), title = COALESCE(?, title) WHERE id = ?")
+          .run(color_hex, title, req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.post("/api/tasks/:id/start", (req, res) => {
     try {
         const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(req.params.id, Date.now());
