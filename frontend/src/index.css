@@ -1,68 +1,85 @@
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import "tailwindcss";
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
+/* 
+  STEP 2 (Optional but Recommended): This restores the dark background and light text
+  from the original template, but in a non-conflicting way.
+*/
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+    background-color: #242424;
+    color: rgba(255, 255, 255, 0.87);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* 
+  STEP 3: This is our custom CSS to create the placeholder effect for the
+  editable divs on our notes.
+*/
+[contentEditable="true"]:empty::before {
+    content: attr(data-placeholder);
+    pointer-events: none; /* Lets you click "through" the placeholder */
+    color: #6b7280; /* A slightly darker gray for better contrast on yellow */
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
+/* --- Add this for the resize handle --- */
+.react-resizable-handle {
+    display: block;
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-repeat: no-repeat;
+    background-origin: content-box;
+    background-position: bottom right;
+    padding: 0 4px 4px 0;
+    box-sizing: border-box;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2IDYiIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOiNmZmZmZmYwMCIgeD0iMHB4IiB5PSIwcHgiIGZpbGw9ImJsYWNrIj48ZyBvcGFjaXR5PSIwLjMwMiI+PHBhdGggZD0iTTQgNiA2IDYgNiA0IEwgNCA2IFoiIGZpbGw9ImJsYWNrIi8+PC9nPjwvc3ZnPg==");
+    cursor: se-resize;
 }
-button:hover {
-  border-color: #646cff;
+.react-resizable-handle:hover {
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMDAwL3N2ZyIgdmlld0JveD0iMCAwIDYgNiIgc3R5bGU9ImJhY2tncm91bmQtY29sb3I6I2ZmZmZmZjAwIiB4PSIwcHgiIHk9IjBweCIgZmlsbD0iYmxhY2siPjxnIG9wYWNpdHk9IjAuNSI+PHBhdGggZD0iTTQgNiA2IDYgNiA0IEwgNCA2IFoiIGZpbGw9ImJsYWNrIi8+PC9nPjwvc3ZnPg==");
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.react-resizable-handle-sw {
+    bottom: 0;
+    left: 0;
+    cursor: sw-resize;
+    transform: rotate(90deg);
 }
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.react-resizable-handle-se {
+    bottom: 0;
+    right: 0;
+    cursor: se-resize;
+}
+.react-resizable-handle-nw {
+    top: 0;
+    left: 0;
+    cursor: nw-resize;
+    transform: rotate(180deg);
+}
+.react-resizable-handle-ne {
+    top: 0;
+    right: 0;
+    cursor: ne-resize;
+    transform: rotate(270deg);
+}
+.react-resizable-handle-w,
+.react-resizable-handle-e {
+    top: 50%;
+    margin-top: -10px;
+    cursor: ew-resize;
+}
+.react-resizable-handle-w {
+    left: 0;
+    transform: rotate(135deg);
+}
+.react-resizable-handle-e {
+    right: 0;
+    transform: rotate(-45deg);
+}
+.react-resizable-handle-n,
+.react-resizable-handle-s {
+    left: 50%;
+    margin-left: -10px;
+    cursor: ns-resize;
+}
+.react-resizable-handle-n {
+    top: 0;
+    transform: rotate(225deg);
 }

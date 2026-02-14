@@ -1,0 +1,4308 @@
+Presentation of file contents for project located at: C:\Users\aperonylo\Desktop\python\__NASMCrypto\cc-app
+=================================================================
+
+```text
+// .gitignore
+# Node.js
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# Electron
+*.asar
+*.asar.unpacked
+
+dist/
+release/
+win-unpacked/
+release_sure/
+build/
+release_sure$/
+dist/
+release/
+build/
+*.exe
+# Ignore all build outputs
+release_sure$/
+release_sure/
+dist/
+build/
+win-unpacked/
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dotenv
+env/
+*.env
+*.env.local
+
+# Babel
+backend/dist/
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+```
+
+```text
+// LICENSE
+MIT License
+
+Copyright (c) 2025 Rahil Vahora
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+```json
+// package.json
+{
+    "name": "nasm-cryptor",
+    "version": "1.0.0",
+    "description": "Advanced cryptographic application using the NASMFAG principle.",
+    "main": "electron/main.js",
+    "scripts": {
+        "start": "concurrently  \"npm:dev:vite\" \"npm:dev:electron\"",
+        "dev:vite": "vite frontend",
+        "dev:electron": "wait-on tcp:5173 && electron .",
+        "build": "vite build frontend && electron-builder",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "rebuild": "npx @electron/rebuild --force --module-dir ."
+    },
+    "author": "Dan",
+    "license": "MIT",
+    "dependencies": {
+        "better-sqlite3": "^11.1.2",
+        "cors": "^2.8.5",
+        "express": "^4.21.2",
+        "nedb-promises": "^6.2.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-draggable": "^4.4.6",
+        "react-resizable": "^3.0.5"
+    },
+    "devDependencies": {
+        "@electron/rebuild": "^3.6.0",
+        "@vitejs/plugin-react": "^4.3.1",
+        "autoprefixer": "^10.4.19",
+        "concurrently": "^8.2.2",
+        "electron": "^31.2.1",
+        "electron-builder": "^25.1.8",
+        "postcss": "^8.4.39",
+        "tailwindcss": "^3.4.6",
+        "vite": "^5.3.4",
+        "wait-on": "^7.2.0"
+    },
+    "build": {
+        "appId": "com.cognicanvas.app",
+        "productName": "CogniCanvas",
+        "files": [
+            "frontend/dist/",
+            "electron/",
+            "backend/",
+            "node_modules/",
+            "package.json"
+        ],
+        "directories": {
+            "buildResources": "assets",
+            "output": "release"
+        },
+        "win": {
+            "target": "nsis",
+            "publisherName": "YourName",
+            "verifyUpdateCodeSignature": false
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    }
+}
+```
+
+```md
+// readme.md
+# React Frontend + Vite + Node.js Backend + Electron
+
+A complete setup for building a cross-platform desktop application using React (frontend), Vite (development tooling), Node.js (backend), and Electron (desktop environment). This project serves as a template for developers looking to build modern desktop applications with a lightweight backend.
+
+---
+
+## Features
+
+- **Frontend**: React powered by Vite for fast builds and development.
+- **Backend**: Node.js with Express and ES6+.
+- **Electron**: Cross-platform desktop application framework.
+- **Integrated Workflow**:
+  - Single command to run frontend, backend, and Electron together.
+  - Easy packaging for production with `electron-builder`.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js**: Install from [Node.js website](https://nodejs.org/).
+
+---
+
+### Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/rahil1202/react-electron-vite-template.git
+   cd electron-react-vite-template
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install 
+   cd frontend && npm install
+   cd backend && npm install
+   ```
+
+---
+
+### Development
+
+To run the project in development mode:
+Go to root directory
+
+```bash
+npm run dev
+```
+
+This will:
+
+- Start the **React frontend** (`http://localhost:5173`).
+- Start the **Node.js backend** (`http://localhost:4000`).
+- Launch the **Electron desktop application**.
+
+---
+
+### Build for Production
+
+1. Build the React frontend:
+
+   ```bash
+   npm run build
+   ```
+
+2. Package the app for distribution:
+
+   ```bash
+   npx electron-builder
+   ```
+If it fails run terminal as administrator and then run above code again.
+
+3. The packaged app will be available in the `dist/` directory, with name `react-electron-vite-template Setup.exe`
+   You may install it and use it. It can be share across easily
+
+---
+
+### Project Structure
+
+```plaintext
+project/
+├── backend/            # Node.js backend
+│   ├── src/            # Backend source code
+│   └── package.json    # Backend dependencies
+│
+├── frontend/           # React frontend (with Vite)
+│   ├── src/            # React source code
+│   └── package.json    # Frontend dependencies
+│
+├── electron/           # Electron main and preload scripts
+│   ├── main.js         # Main process
+│   └── preload.js      # Preload script
+│
+├── package.json        # Root dependencies for Electron
+└── README.md           # Project documentation
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Author
+
+- GitHub: [rahil1202](https://github.com/rahil1202)
+- Email: <rahilisvahora@gmail.com>
+- LinkedIn:[rahil-vahora](https://linkedin.com/in/rahil-vahora)
+```
+
+```md
+// readme_todo_next.md
+To move **CogniCanva** toward a professional, Google-like desktop environment, we must address the remaining technical debt and functional gaps.
+
+Here is the thorough list of problems categorized by priority:
+
+### 1. High Priority: Data Integrity & OS Architecture
+*   **Database Migration Reliability:** The current "on-the-fly" migration for the `rating` column is a hotfix. We need a robust versioning system for `cognicanvas.db` so that future schema changes (like adding efficiency rates) don't crash the app.
+*   **Window Z-Index Management:** Currently, when multiple windows (Cryptor, Settings, Tasks) are open, clicking one doesn't necessarily bring it to the "front." We need a "Focus" system where the active window's Z-index is incremented.
+*   **Shortcuts Path Normalization:** On Windows, paths like `C:/Users` vs `C:\Users` can break `child_process.exec`. We need a centralized backend utility to sanitize paths before executing `start ""`.
+*   **Global Settings Persistence:** The `settings` table is implemented, but the Frontend doesn't yet load the theme (Canvas color) or saved shortcuts automatically on startup.
+
+### 2. High Priority: Canvas Mechanics (CogniCanvas)
+*   **Recursive Frame Movement:** If a Frame is inside another Frame (nested structure), the movement logic currently only moves direct children. We need recursive coordinate updates.
+*   **Drag-to-Capture Precision:** The "Note Capture" logic currently uses a simple center-point check. This can feel "glitchy" with large notes and small frames. It needs a "Collision Detection" algorithm (AABB intersection).
+*   **Teleport Links (Broken/Missing):** The `[[note:id]]` syntax is parsed, but clicking the link doesn't yet "pan and zoom" the camera to the target note.
+*   **Note Scaling vs Content:** When a note is resized very small, the `TagManager` and `Content` overlap and become unreadable. We need "Adaptive UI" (hiding the tag bar if the height is < 100px).
+
+### 3. Functional Gaps: The MPSI App Suite
+*   **The "Calendar/Efficiency" Gap:** Tasks are logged, but there is no UI to see the history. We need a "Log Viewer" app that displays sessions by day, showing the calculated efficiency (Time vs Rating).
+*   **Chronometer Persistence:** If the app is closed while a timer is running, the `start_time` is saved, but the UI doesn't "resume" the count automatically when the app restarts.
+*   **Task Widget Customization:** Unlike Notes, Tasks don't yet have the right-click color picker or the ability to change their individual background colors.
+
+### 4. Technical Debt: Performance & Warnings
+*   **The "findDOMNode" Plague:** While fixed in `TaskWidget` and `WindowFrame`, this warning likely still exists in `Frame.jsx` and `Note.jsx`. Every `Draggable` instance must be verified for `nodeRef` usage.
+*   **Canvas Render Bottleneck:** Re-rendering the entire canvas (every note and frame) when one note moves is inefficient. We should move to a more optimized state management (like `Zustand` or localized state) to prevent "Note Jitter."
+*   **Search Regex Support:** The search currently only supports simple strings. For MPSI students, Regex support (e.g., searching `math|physics`) is a high-value tool.
+
+### 5. Cryptor 2.0 (The Standalone Rework)
+*   **Key Generator UI:** The current "Key Vault" is too simple. It needs a "Pro Mode" where the user can choose the NASM Degree (`d`), the specific mathematical operations (`I`), and the Transformation Constants (`TC`) manually.
+*   **Large File Streaming:** Encrypting a 1GB file currently loads the whole buffer into memory, which will crash the app. We need to move from `fs.readFile` to `fs.createReadStream` to handle large MPSI lecture videos.
+
+### 6. UX & "Google-Like" Polish
+*   **Command Palette:** Implement `Ctrl + K` to open a global search bar (like Google Search or Spotlight) that can launch apps, search notes, or trigger system commands.
+*   **Desktop "Dock" Feedback:** Icons in the left dock don't show "Active" indicators (e.g., a small dot underneath) if an app is open but minimized/behind others.
+
+---
+
+**Which one should we solve next?**
+1.  **The "Front-End Focus" (Z-index + Teleport Links + nodeRef cleanup)**
+2.  **The "Task Evolution" (Calendar/History App + Chronometer persistence)**
+3.  **The "Cryptor 2.0" (Pro Key Gen + Large File Streaming)**
+
+---
+
+Understood. I have integrated the new crash report into the master list. Here is the thorough breakdown of all current issues and technical debt within **CogniCanva**.
+
+### Group A: Critical Crashes & System Errors
+1.  **Canvas Rendering Crash (`ReferenceError: view is not defined`):** The recent refactor from `view` state to `viewRef` caused a break in the JSX render. Line 252 is attempting to access a variable `view` that no longer exists in that scope.
+2.  **Database Schema Mismatch (`SqliteError: no such column: rating`):** The backend is attempting to write to columns that don't exist in the user's local `cognicanvas.db`. The migration script failed to execute or was blocked.
+3.  **Double-Click "Forbidden Area":** Clicks inside the note-populated area of the canvas fail to create new notes because the `transform-layer` is capturing pointer events without a proper fallback to the container.
+
+### Group B: UI/UX & Mechanics (The "Desktop" Feel)
+1.  **Zoom Anchor Logic:** Zooming currently centers on the top-left (0,0) or a static center rather than the user's mouse pointer, making navigation disorienting.
+2.  **The "Inertia" Conflict:** Note/Frame movement feels laggy because CSS transitions are conflicting with real-time `react-draggable` coordinate updates.
+3.  **Frame-Child Synchronization:** When a Frame moves, the notes inside must move recursively. When a Frame collapses, the notes must be visually and functionally "unmounted" to prevent accidental interaction.
+4.  **`findDOMNode` Deprecation Warnings:** Several components (`TaskWidget`, `Note`, `Frame`) are triggering StrictMode warnings that will cause issues in future React versions.
+
+### Group C: MPSI Suite (Tasks & Chronometer)
+1.  **Task Widget UX:** Tasks currently lack a "Seconds" display, a functional "Stop" button in the UI, and a resize handle.
+2.  **Chronometer Persistence:** If the app restarts, running timers do not visually resume counting despite being active in the database.
+3.  **Session History (The "Calendar" Data):** We have the data structure for `ratings` and `session_notes`, but no interface to view the history of study sessions.
+4.  **Task Color/Tag Integration:** Tasks need the same tagging and color-customization logic as Notes to allow for future "Efficiency Filtering."
+
+### Group D: System Services & Apps
+1.  **Settings App (The Control Panel):** No functional UI exists to manage theme colors (stored in DB) or to add/delete shortcuts using a native file picker.
+2.  **Shortcut Path Normalization:** Windows paths (`\` vs `/`) are causing silent failures or defaulting to `C:/` when launching external MPSI apps.
+3.  **Cryptor 2.0:** The encryption tool needs to be converted from a dashboard page to a standalone floating window with a "Vault" for managing NASM keys.
+
+### Group E: Advanced Power Features
+1.  **Teleport Links:** The `[[note:id]]` links are rendered but do not yet trigger the Canvas to pan/zoom to the target coordinate.
+2.  **Command Palette (`Ctrl + K`):** No global search/action bar exists to allow "Google-like" navigation through the OS.
+3.  **Search Regex Support:** Search is currently limited to plain text; complex filtering for MPSI study (e.g., `math AND urgent`) is missing.
+
+---
+
+**Which specific problem should we tackle first?** 
+*(I recommend starting with **A1** and **A2** to stop the app from crashing, or **D1** to build the foundation for theme customization).*
+
+
+
+
+
+AFTER SOME IMPROVEMENTS, WE ARE NOW HERE
+
+# CogniCanvas: Project Status & Handover
+
+## Critical Fixes Deployed
+1.  **HUD Restoration:** Task Widgets are now rendered in Screen Space (HUD), meaning they stay fixed on your screen while you zoom/pan the canvas.
+2.  **HTML Interpretation:** Notes now correctly display bold, italics, and custom links (`[[note:id]]`) without displaying raw HTML tags. The saving logic has been strictly scoped to avoid double-encoding.
+3.  **Task Calendar:** A detailed "Day View" has been added. Clicking a square on the heatmap reveals the exact tasks and durations for that day.
+4.  **Crash Fixes:** Removed the infinite loop in `TaskWidget` and the `useRef` crash.
+
+## Known Omissions & Technical Debt
+*   **Window Dragging:** The `App.jsx` uses a simplified window rendering logic. The Z-Index management (bringing a clicked window to front) is basic.
+*   **Task Deletion:** I implemented a "Hide" logic for task termination in the widget. A true `DELETE /api/tasks/:id` endpoint in `server.js` was added in the previous step but ensure it is robust (cascading deletes for time logs).
+*   **Performance:** `Canvas.jsx` re-renders frequently on zoom/pan. For large datasets (>100 notes), migrate the `view` state to a Ref-based loop (requestAnimationFrame) to decouple React renders from 60fps canvas updates.
+
+## Roadmap for Next Developer
+1.  **Mobile Companion App:** Build a simple React Native app that connects to the same IP (P2P logic from `p2p-service.js` is the foundation).
+2.  **Search Regex UI:** The backend supports Regex, but the Frontend search bar needs a "Toggle Regex" button to switch between plain text and regex modes.
+3.  **Encrypted Sync:** The `nasm-engine.js` is powerful. Use it to encrypt the entire SQLite DB file before syncing to cloud (Google Drive/Dropbox API).
+
+## Debugging
+*   **Notes:** Check console for `[Note X Debug]` to see exactly what HTML is being saved vs rendered.
+*   **Tasks:** If tasks don't appear in HUD, verify `showTasks` prop in `Canvas.jsx` is true.
+
+THIS STATE IS COMPLEMENTARY AND DOESN'T OVERHAUL THE PREVIOUS UPGRADES TO BE DONE
+```
+
+```js
+// backend\server.js
+const express = require('express');
+const cors = require('cors');
+const Database = require('better-sqlite3');
+const path = require('path');
+const fileService = require('./services/file-service');
+const dbService = require('./services/db-service');
+const systemService = require('./services/system-service');
+
+const PORT = 4000;
+const app = express();
+
+const SECRET_TOKEN = process.argv[2];
+const USER_DATA_PATH = process.argv[3];
+
+if (!SECRET_TOKEN || !USER_DATA_PATH) {
+  console.error('FATAL ERROR: Server started without token or path.');
+  process.exit(1);
+}
+
+app.use(cors());
+app.use(express.json());
+
+// Security Middleware
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${SECRET_TOKEN}`) {
+    return res.status(403).json({ error: 'Forbidden: Invalid token.' });
+  }
+  next();
+});
+
+const db = new Database("cognicanvas.db");
+// --- NEW: Register Regex Function ---
+db.function('regexp', (pattern, str) => {
+    try {
+        return new RegExp(pattern, 'i').test(str) ? 1 : 0;
+    } catch (e) { return 0; }
+});
+db.pragma("foreign_keys = ON");
+
+// --- ROBUST MIGRATION SYSTEM ---
+const MIGRATIONS = [
+    {
+        version: 1,
+        up: `
+            CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
+            CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
+            CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
+            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+        `
+    },
+    {
+        version: 2,
+        up: `
+            ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;
+            ALTER TABLE time_logs ADD COLUMN session_notes TEXT;
+        `
+    },
+    {
+        version: 3,
+        up: `
+            ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';
+        `
+    }
+];
+
+const runMigrations = () => {
+    // 1. Initialize Version Table
+    db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER DEFAULT 0)`);
+    const result = db.prepare("SELECT version FROM schema_version").get();
+    let currentVersion = result ? result.version : 0;
+
+    if (!result) db.prepare("INSERT INTO schema_version (version) VALUES (0)").run();
+
+    console.log(`[DB] Current Schema Version: ${currentVersion}`);
+
+    // 2. Apply Missing Migrations
+    db.transaction(() => {
+        for (const migration of MIGRATIONS) {
+            if (migration.version > currentVersion) {
+                console.log(`[DB] Applying migration v${migration.version}...`);
+                try {
+                    // Check if columns exist before altering (defensive coding for dev envs)
+                    if (migration.version === 2) {
+                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
+                        if (!cols.some(c => c.name === 'rating')) db.exec(migration.up);
+                    } else if (migration.version === 3) {
+                        const cols = db.prepare("PRAGMA table_info(tasks)").all();
+                        if (!cols.some(c => c.name === 'color_hex')) db.exec(migration.up);
+                    } else {
+                        db.exec(migration.up);
+                    }
+                } catch (e) {
+                    // Ignore "duplicate column" errors if manual hotfixes were applied previously
+                    if (!e.message.includes('duplicate column')) throw e;
+                }
+                currentVersion = migration.version;
+            }
+        }
+        db.prepare("UPDATE schema_version SET version = ?").run(currentVersion);
+    })();
+    console.log(`[DB] Database is up to date (v${currentVersion}).`);
+};
+
+runMigrations();
+
+// --- HELPERS ---
+const getTagsFor = (table, id) => {
+  return db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`).all(id);
+};
+
+// --- API ROUTES: CANVAS ---
+app.get("/api/shortcuts", (req, res) => {
+    try {
+        const shortcuts = db.prepare("SELECT * FROM shortcuts").all();
+        res.json(shortcuts);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/shortcuts", (req, res) => {
+    try {
+        const { title, target, type } = req.body;
+        const stmt = db.prepare("INSERT INTO shortcuts (title, target, type) VALUES (?, ?, ?)");
+        const info = stmt.run(title, target, type);
+        res.json({ id: info.lastInsertRowid, ...req.body });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/shortcuts/:id", (req, res) => {
+    db.prepare("DELETE FROM shortcuts WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+});
+
+app.get("/api/settings", (req, res) => {
+    const rows = db.prepare("SELECT * FROM settings").all();
+    const settings = {};
+    rows.forEach(r => settings[r.key] = r.value);
+    res.json(settings);
+});
+
+app.post("/api/settings", (req, res) => {
+    const { key, value } = req.body;
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+    res.json({ success: true });
+});
+
+app.get("/api/all", (req, res) => {
+  const notes = db.prepare("SELECT * FROM notes").all().map(n => ({ ...n, tags: getTagsFor("note", n.id) }));
+  const frames = db.prepare("SELECT * FROM frames").all().map(f => ({ ...f, tags: getTagsFor("frame", f.id) }));
+  
+  const tasks = db.prepare("SELECT * FROM tasks").all().map(task => {
+    const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
+    const tags = getTagsFor("task", task.id); 
+    return {
+      ...task,
+      is_running: !!activeLog,
+      current_session_start: activeLog ? activeLog.start_time : null,
+      tags: tags 
+    };
+  });
+
+  res.json({ notes, frames, tasks });
+});
+
+app.post("/api/notes", (req, res) => {
+  const { content, pos_x, pos_y, width, height, color_hex } = req.body;
+  const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
+  res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
+});
+app.get("/api/search", (req, res) => {
+    try {
+        const query = req.query.q;
+        if (!query) return res.status(200).json({ noteIds: [], frameIds: [] });
+        
+        // Use REGEXP for power users, fallback to LIKE logic handled by the custom function if simple text
+        // The custom function handles the regex logic.
+        const noteIds = db
+            .prepare(`SELECT id FROM notes WHERE content REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        const frameIds = db
+            .prepare(`SELECT id FROM frames WHERE title REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        res.status(200).json({ noteIds, frameIds });
+    } catch (error) {
+        // Fallback for invalid regex syntax to normal substring search
+        try {
+             const fallbackQuery = `%${query}%`;
+             const noteIds = db.prepare(`SELECT id FROM notes WHERE content LIKE ?`).all(fallbackQuery).map(r => r.id);
+             const frameIds = db.prepare(`SELECT id FROM frames WHERE title LIKE ?`).all(fallbackQuery).map(r => r.id);
+             res.status(200).json({ noteIds, frameIds });
+        } catch(e) {
+             res.status(500).json({ error: error.message });
+        }
+    }
+});
+// --- REPLACE THE EXISTING app.put("/api/notes/:id") WITH THIS ROBUST VERSION ---
+app.put("/api/notes/:id", (req, res) => {
+  try {
+      const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
+      
+      // Safety Check: Ensure note exists before trying to read it
+      const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
+      if (!existing) {
+          return res.status(404).json({ error: "Note not found (might have been deleted)" });
+      }
+
+      // If frame_id is explicitly undefined, keep existing. If null/number, use it.
+      // If we are moving (pos_x changed), we might be auto-updating frame_id.
+      // If frame_id is undefined in body, use existing.frame_id
+      const finalFrameId = frame_id === undefined ? existing.frame_id : frame_id;
+
+      const stmt = db.prepare(`
+        UPDATE notes SET 
+        content = COALESCE(?, content), 
+        pos_x = COALESCE(?, pos_x), 
+        pos_y = COALESCE(?, pos_y), 
+        width = COALESCE(?, width), 
+        height = COALESCE(?, height), 
+        color_hex = COALESCE(?, color_hex),
+        frame_id = ?
+        WHERE id = ?`);
+        
+      stmt.run(content, pos_x, pos_y, width, height, color_hex, finalFrameId, req.params.id);
+      res.json({ success: true });
+  } catch (error) {
+      console.error("Update Note Error:", error);
+      res.status(500).json({ error: error.message });
+  }
+});
+app.delete("/api/notes/:id", (req, res) => {
+  db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
+  res.json({ success: true });
+});
+
+// --- TAGS ---
+app.post("/api/tags/:itemType/:itemId", (req, res) => {
+  const { itemType, itemId } = req.params; 
+  const { name } = req.body;
+  
+  let table;
+  if (itemType === 'notes') table = 'note';
+  else if (itemType === 'frames') table = 'frame';
+  else if (itemType === 'tasks') table = 'task';
+  else return res.status(400).json({ error: "Invalid item type" });
+  
+  db.transaction(() => {
+    let tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(name);
+    if (!tag) {
+      const info = db.prepare("INSERT INTO tags (name) VALUES (?)").run(name);
+      tag = { id: info.lastInsertRowid };
+    }
+    db.prepare(`INSERT OR IGNORE INTO ${table}_tags (${table}_id, tag_id) VALUES (?, ?)`).run(itemId, tag.id);
+  })();
+  res.status(201).json({ message: "Tag added" });
+});
+
+app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
+  const { itemType, itemId, tagName } = req.params;
+  let table;
+  if (itemType === 'notes') table = 'note';
+  else if (itemType === 'frames') table = 'frame';
+  else if (itemType === 'tasks') table = 'task';
+  
+  const tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(tagName);
+  if (tag) {
+    db.prepare(`DELETE FROM ${table}_tags WHERE ${table}_id = ? AND tag_id = ?`).run(itemId, tag.id);
+  }
+  res.json({ message: "Tag removed" });
+});
+
+app.put("/api/tags/:name", (req, res) => {
+  db.prepare("UPDATE tags SET color_hex = ? WHERE name = ?").run(req.body.color_hex, req.params.name);
+  res.json({ success: true });
+});
+
+// --- KEYS & CRYPTO ---
+app.get('/api/keys', async (req, res) => {
+  try { res.json(await dbService.getKeys() || []); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/keys', async (req, res) => {
+  try { res.json({ success: true, result: await dbService.saveKey(req.body) }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/keys/:id', async (req, res) => {
+  try { await dbService.deleteKey(req.params.id); res.json({ success: true }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/encrypt', async (req, res) => {
+  const { filePath, keyConfig, intensity, savePath } = req.body;
+  const result = await fileService.encryptFile(filePath, keyConfig, intensity, savePath, () => {}, () => {});
+  res.json(result);
+});
+
+app.post('/api/decrypt', async (req, res) => {
+  const { filePath, keyConfig, savePath } = req.body;
+  const result = await fileService.decryptFile(filePath, keyConfig, savePath, () => {}, () => {});
+  res.json(result);
+});
+
+// --- SYSTEM ---
+app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
+app.post('/api/system/run', async (req, res) => res.json(await systemService.runCommand(req.body.command, req.body.args)));
+
+// --- FRAMES ---
+app.post("/api/frames", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height } = req.body;
+        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
+        const info = stmt.run(title, pos_x, pos_y, width, height);
+        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.put("/api/frames/:id", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
+        const updates = [];
+        const params = [];
+        if (title !== undefined) { updates.push("title = ?"); params.push(title); }
+        if (pos_x !== undefined) { updates.push("pos_x = ?"); params.push(pos_x); }
+        if (pos_y !== undefined) { updates.push("pos_y = ?"); params.push(pos_y); }
+        if (width !== undefined) { updates.push("width = ?"); params.push(width); }
+        if (height !== undefined) { updates.push("height = ?"); params.push(height); }
+        if (is_collapsed !== undefined) { updates.push("is_collapsed = ?"); params.push(is_collapsed); }
+        
+        params.push(req.params.id);
+        
+        db.prepare(`UPDATE frames SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/frames/:id", (req, res) => {
+    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// --- TASKS ---
+app.post("/api/tasks", (req, res) => {
+    try {
+        const { title } = req.body;
+        const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms) VALUES (?, 0, ?, 0)");
+        const info = stmt.run(title, Date.now());
+        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.put("/api/tasks/:id", (req, res) => {
+    try {
+        const { color_hex, title } = req.body;
+        // Allow updating color and title
+        db.prepare("UPDATE tasks SET color_hex = COALESCE(?, color_hex), title = COALESCE(?, title) WHERE id = ?")
+          .run(color_hex, title, req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/tasks/:id/start", (req, res) => {
+    try {
+        const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(req.params.id, Date.now());
+        res.json({ logId: info.lastInsertRowid });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post("/api/tasks/:id/stop", (req, res) => {
+    const { rating, notes } = req.body; 
+    const now = Date.now();
+    const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
+    
+    if(log) {
+        db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ? WHERE id = ?")
+          .run(now, rating || 0, notes || "", log.id);
+        
+        const duration = now - log.start_time;
+        db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(duration, req.params.id);
+        res.json({ success: true, duration });
+    } else {
+        res.status(400).json({ error: "No running timer" });
+    }
+});
+// --- ADD THIS NEW ROUTE FOR TASK HISTORY ---
+app.get("/api/history", (req, res) => {
+    try {
+        const logs = db.prepare(`
+            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, t.title as task_title, t.color_hex 
+            FROM time_logs l 
+            JOIN tasks t ON l.task_id = t.id 
+            WHERE l.end_time IS NOT NULL 
+            ORDER BY l.start_time DESC 
+            LIMIT 50
+        `).all();
+        res.json(logs);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
+  dbService.init(USER_DATA_PATH); 
+});
+```
+
+```js
+// backend\services\db-service.js
+// backend/services/db-service.js
+const Datastore = require('nedb-promises');
+const crypto = require('crypto');
+const fs = require('fs').promises;
+const path = require('path');
+// REMOVED: const { app } = require('electron'); // This caused the crash
+
+// CONSTANTS
+const MASTER_PASSWORD = 'this-should-be-securely-obtained-from-user';
+const SALT = 'nas-m-cryptor-static-salt';
+
+class DatabaseService {
+  constructor() {
+    this.db = null;
+    this.masterKey = null;
+    this.dbPath = null; // Path will be set in init()
+  }
+
+  // Initialize: Derived key + Load DB. 
+  // userDataPath is passed from server.js (who got it from main.js)
+  async init(userDataPath) {
+    if (!userDataPath) throw new Error("DatabaseService initialized without path");
+    
+    this.dbPath = path.join(userDataPath, 'secure.db');
+    this.masterKey = crypto.pbkdf2Sync(MASTER_PASSWORD, SALT, 100000, 32, 'sha512');
+    await this._load();
+  }
+
+  async _load() {
+    try {
+      const encryptedData = await fs.readFile(this.dbPath);
+      const iv = encryptedData.slice(0, 16);
+      const authTag = encryptedData.slice(16, 32);
+      const ciphertext = encryptedData.slice(32);
+
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.masterKey, iv);
+      decipher.setAuthTag(authTag);
+      
+      const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      
+      this.db = Datastore.create({ inMemoryOnly: true });
+      await this.db.loadDatabase();
+      const docs = JSON.parse(decrypted.toString('utf-8'));
+      await this.db.insert(docs);
+      console.log("Secure DB loaded successfully.");
+
+    } catch (error) {
+      console.log("Creating new Secure DB at", this.dbPath);
+      this.db = Datastore.create({ inMemoryOnly: true });
+    }
+  }
+
+  async _persist() {
+    if (!this.db) return;
+    const docs = await this.db.find({});
+    const data = JSON.stringify(docs);
+    
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.masterKey, iv);
+    
+    const encrypted = Buffer.concat([cipher.update(data, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    await fs.writeFile(this.dbPath, Buffer.concat([iv, authTag, encrypted]));
+  }
+
+  async getKeys() { return this.db ? this.db.find({ type: 'key' }) : []; }
+  
+  async saveKey(key) {
+    if (!this.db) return null;
+    const result = await this.db.update({ _id: key._id }, { ...key, type: 'key' }, { upsert: true });
+    await this._persist();
+    return result;
+  }
+  
+  async deleteKey(keyId) {
+    if (!this.db) return null;
+    const result = await this.db.remove({ _id: keyId, type: 'key' });
+    await this._persist();
+    return result;
+  }
+  
+  async getPeers() { return this.db ? this.db.find({ type: 'peer' }) : []; }
+  async addPeer(peerName, seedFilePath) {
+      // Stub for peer addition
+      const peer = { peerName, seedFilePath, type: 'peer' };
+      await this.db.insert(peer);
+      await this._persist();
+      return peer;
+  }
+}
+
+module.exports = new DatabaseService();
+```
+
+```js
+// backend\services\file-service.js
+// electron/services/file-service.js
+const fs = require('fs').promises;
+const path = require('path');
+const { dialog } = require('electron');
+const { processBuffer } = require('./nasm-engine');
+
+class FileService {
+  async encryptFile(filePath, keyConfig, intensity, savePath = null, onProgress = () => {}, onNotify = () => {}) {
+    try {
+      onProgress(0);
+      onNotify({ title: 'Encryption', body: `Reading file ${path.basename(filePath)}...` });
+      const sourceBuffer = await fs.readFile(filePath);
+
+      onNotify({ title: 'Encryption', body: `Encrypting... This may take a while.` });
+      const encryptedBuffer = processBuffer(sourceBuffer, keyConfig, intensity, (p) => onProgress(p));
+      
+      let finalSavePath = savePath;
+      if (!finalSavePath) {
+        const { canceled, filePath: chosenPath } = await dialog.showSaveDialog({
+          defaultPath: `${filePath}.nasm`,
+        });
+
+        if (canceled || !chosenPath) {
+          onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
+          return { success: false, error: 'Cancelled by user.' };
+        }
+
+        finalSavePath = chosenPath;
+      }
+
+      await fs.writeFile(finalSavePath, encryptedBuffer);
+      onNotify({ title: 'Success', body: `File successfully encrypted to ${path.basename(finalSavePath)}` });
+      return { success: true, path: finalSavePath };
+
+    } catch (error) {
+      console.error('Encryption failed:', error);
+      onNotify({ title: 'Error', body: `Encryption failed: ${error.message}` });
+      return { success: false, error: error.message };
+    }
+  }
+
+  async decryptFile(filePath, keyConfig, savePath = null, onProgress = () => {}, onNotify = () => {}) {
+    // Similar structure to encryptFile, but calls processBuffer and suggests a decrypted filename.
+    try {
+      onProgress(0);
+      onNotify({ title: 'Decryption', body: `Reading file ${path.basename(filePath)}...` });
+      const sourceBuffer = await fs.readFile(filePath);
+
+      onNotify({ title: 'Decryption', body: `Decrypting...` });
+      const decryptedBuffer = processBuffer(sourceBuffer, keyConfig, 1, (p) => onProgress(p)); // Intensity is 1 for decryption
+
+      const originalName = filePath.endsWith('.nasm') ? filePath.slice(0, -5) : `${filePath}.decrypted`;
+      let finalSavePath = savePath;
+      if (!finalSavePath) {
+        const { canceled, filePath: chosenPath } = await dialog.showSaveDialog({
+          defaultPath: originalName,
+        });
+
+        if (canceled || !chosenPath) {
+          onNotify({ title: 'Cancelled', body: 'Save operation was cancelled.' });
+          return { success: false, error: 'Cancelled by user.' };
+        }
+
+        finalSavePath = chosenPath;
+      }
+
+      await fs.writeFile(finalSavePath, decryptedBuffer);
+      onNotify({ title: 'Success', body: `File successfully decrypted to ${path.basename(finalSavePath)}` });
+      return { success: true, path: finalSavePath };
+
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      onNotify({ title: 'Error', body: `Decryption failed: ${error.message}` });
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+module.exports = new FileService();
+```
+
+```js
+// backend\services\nasm-engine.js
+// electron/services/nasm-engine.js
+
+// This class encapsulates the entire state and logic of a NASMFAG sequence.
+class NASMEngine {
+  constructor(config) {
+    this._config = config;
+    this._cache = {}; // Memoization for performance
+    this._parseOperations();
+  }
+
+  // CRITICAL: A safe replacement for eval().
+  _parseOperations() {
+    this._safeOps = this._config.I.map(opPair => {
+      const prefix = opPair[0];
+      const suffix = opPair[1];
+      // In a real scenario, this would be a proper AST parser.
+      // For this example, we'll handle simple arithmetic safely.
+      const op = suffix.charAt(0);
+      const num = parseFloat(suffix.substring(1));
+      if (isNaN(num)) throw new Error(`Invalid operation: ${suffix}`);
+
+      return (val) => {
+        switch (op) {
+          case '+': return val + num;
+          case '-': return val - num;
+          case '*': return val * num;
+          case '/': return val / num;
+          default: throw new Error(`Unsupported operator: ${op}`);
+        }
+      };
+    });
+  }
+
+  // The core recursive function `f(x)`.
+  _f(x) {
+    if (x < 0) return 0;
+    if (this._cache[x] !== undefined) return this._cache[x];
+
+    let result;
+    const { starts, d, TC, minBound, maxBound } = this._config;
+
+    if (x < d) {
+      result = starts[x];
+    } else {
+      let ntc = 0;
+      for (let v = 0; v < x - d; v++) ntc += TC[v % TC.length];
+      const opIndex = (x - d + ntc) % this._safeOps.length;
+      const operation = this._safeOps[opIndex];
+      result = operation(this._f(x - d));
+    }
+
+    const range = maxBound - minBound;
+    if (range <= 0) return minBound;
+    let bounded = Math.floor(result);
+    this._cache[x] = minBound + ((bounded - minBound) % range + range) % range;
+    return this._cache[x];
+  }
+
+  // Generator function to produce the keystream byte by byte, saving memory.
+  *keystream(length, intensity) {
+    for (let i = 0; i < length; i++) {
+      let value = i;
+      for (let j = 0; j < intensity; j++) {
+        value = this._f(value + j * length); // Add complexity
+      }
+      yield value % 256; // Output a single byte
+    }
+  }
+}
+
+// The public function that services will use.
+function processBuffer(sourceBuffer, keyConfig, intensity, onProgress) {
+  const engine = new NASMEngine(keyConfig);
+  const resultBuffer = Buffer.alloc(sourceBuffer.length);
+  const stream = engine.keystream(sourceBuffer.length, intensity);
+
+  for (let i = 0; i < sourceBuffer.length; i++) {
+    const keyByte = stream.next().value;
+    resultBuffer[i] = sourceBuffer[i] ^ keyByte; // XOR encryption
+    if (i % 4096 === 0) {
+      onProgress(i / sourceBuffer.length);
+    }
+  }
+  onProgress(1);
+  return resultBuffer;
+}
+
+module.exports = { processBuffer };
+```
+
+```js
+// backend\services\p2p-service.js
+// electron/services/p2p-service.js
+const crypto = require('crypto');
+const fs = require('fs').promises;
+// const DHT = require('dht-rpc'); // Hypothetical library
+// const portKnock = require('port-knocking'); // Hypothetical library
+const { dbService } = require('./db-service');
+//const dbService = require('./db-service'); // Corrected from { dbService }
+
+class P2PService {
+  constructor() {
+    // this.dht = new DHT(); // Initialize the DHT client
+  }
+
+  async createGenesisSeed(peerName) {
+    const seed = crypto.randomBytes(256);
+    const savePath = dialog.showSaveDialogSync({ defaultPath: `${peerName}-seed.nasmkey` });
+    if (savePath) {
+      await fs.writeFile(savePath, seed);
+      return savePath;
+    }
+    return null;
+  }
+
+  // Derives the rendezvous strategy for the current time window.
+  _getStrategy(seed) {
+    const timeWindow = Math.floor(Date.now() / 10000); // 10-second window
+    const hmac = crypto.createHmac('sha256', seed);
+    hmac.update(String(timeWindow));
+    const digest = hmac.digest();
+
+    return {
+      mailbox: digest.slice(0, 20), // 20-byte ID for DHT
+      knockSequence: [digest.readUInt16BE(20), digest.readUInt16BE(22)],
+      handshakeKey: digest.slice(24, 32),
+    };
+  }
+
+  async sendFile(peerId, filePath, onProgress, onNotify) {
+    onNotify({ title: 'P2P', body: `Preparing to send to peer ${peerId}...` });
+    const peer = await dbService.getPeerById(peerId);
+    if (!peer) throw new Error('Peer not found.');
+
+    const strategy = this._getStrategy(peer.genesisSeed);
+
+    // 1. Announce presence on the DHT
+    // const myIp = await getPublicIp();
+    // this.dht.put(strategy.mailbox, Buffer.from(myIp));
+
+    // 2. Listen for their IP and initiate port knock.
+    // ... complex logic for listening and knocking ...
+
+    onNotify({ title: 'P2P', body: `Connection established. Sending file...` });
+    // 3. Once connected, stream the file.
+  }
+}
+
+module.exports = new P2PService();
+```
+
+```js
+// backend\services\system-service.js
+// backend/services/system-service.js
+const { exec, spawn } = require('child_process');
+const path = require('path');
+const os = require('os');
+
+class SystemService {
+  
+  // Open a URL or File using the default OS handler
+  async openExternal(target) {
+    const platform = os.platform();
+    let command;
+    
+    // NORMALIZE PATH: Fix mixed slashes for Windows
+    const safeTarget = path.normalize(target);
+
+    if (platform === 'win32') {
+      // WINDOWS FIX: 
+      // 1. "start" needs a dummy title argument ("") before the path.
+      // 2. We wrap the path in quotes to handle spaces.
+      command = `start "" "${safeTarget}"`;
+    } else if (platform === 'darwin') {
+      command = `open "${safeTarget}"`;
+    } else {
+      command = `xdg-open "${safeTarget}"`;
+    }
+
+    console.log(`[System] Executing: ${command}`); // Debug log
+
+    return new Promise((resolve) => {
+      exec(command, (error) => {
+        if (error) {
+            console.error(`[System] Exec error: ${error.message}`);
+            resolve({ success: false, error: error.message });
+        } else {
+            resolve({ success: true });
+        }
+      });
+    });
+  }
+
+  // Execute a specific command (e.g., Run a Python script for MPSI)
+  async runCommand(command, args = []) {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, { shell: true });
+      
+      let stdout = '';
+      let stderr = '';
+
+      process.stdout.on('data', (data) => stdout += data.toString());
+      process.stderr.on('data', (data) => stderr += data.toString());
+
+      process.on('close', (code) => {
+        resolve({ 
+            success: code === 0, 
+            output: stdout, 
+            error: stderr,
+            code 
+        });
+      });
+    });
+  }
+}
+
+module.exports = new SystemService();
+```
+
+```js
+// electron\ipc-handlers.js
+// electron/ipc-handlers.js
+const { ipcMain, dialog } = require('electron');
+const { IPC_CHANNELS } = require('../shared/constants');
+const fileService = require('../backend/services/file-service');
+const dbService = require('../backend/services/db-service');
+const p2pService = require('../backend/services/p2p-service');
+
+function setupIpcHandlers(mainWindow) {
+  const notify = (message) => mainWindow.webContents.send(IPC_CHANNELS.NOTIFY_USER, message);
+  const progress = (percent) => mainWindow.webContents.send(IPC_CHANNELS.NOTIFY_PROGRESS, percent);
+
+  // File System
+  ipcMain.handle(IPC_CHANNELS.FILE_SELECT, async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog();
+    return canceled ? null : filePaths[0];
+  });
+  ipcMain.handle(IPC_CHANNELS.FILE_ENCRYPT, (evt, fp, key, intensity) => fileService.encryptFile(fp, key, intensity, progress, notify));
+  ipcMain.handle(IPC_CHANNELS.FILE_DECRYPT, (evt, fp, key) => fileService.decryptFile(fp, key, progress, notify));
+
+  // Keys
+  ipcMain.handle(IPC_CHANNELS.DB_GET_KEYS, () => dbService.getKeys());
+  ipcMain.handle(IPC_CHANNELS.DB_SAVE_KEY, (evt, key) => dbService.saveKey(key));
+  ipcMain.handle(IPC_CHANNELS.DB_DELETE_KEY, (evt, id) => dbService.deleteKey(id));
+  
+  // Peers & P2P
+  ipcMain.handle(IPC_CHANNELS.DB_GET_PEERS, () => dbService.getPeers());
+  ipcMain.handle(IPC_CHANNELS.P2P_CREATE_SEED, (evt, name) => p2pService.createGenesisSeed(name));
+  ipcMain.handle(IPC_CHANNELS.DB_ADD_PEER, (evt, name, path) => dbService.addPeer(name, path));
+  ipcMain.handle(IPC_CHANNELS.P2P_SEND_FILE, (evt, peerId, fp) => p2pService.sendFile(peerId, fp, progress, notify));
+}
+
+module.exports = { setupIpcHandlers };
+```
+
+```js
+// electron\main.js
+// electron/main.js
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+const crypto = require('crypto');
+// Remove the dbService import from here to prevent "app.getPath is not a function" errors
+// We let the backend handle the DB entirely.
+
+const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
+let backendProcess = null;
+
+function createWindow() {
+  const mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (app.isPackaged) {
+    mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
+  } else {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  }
+  return mainWindow;
+}
+
+function startBackend() {
+  const backendPath = path.join(__dirname, '../backend/server.js');
+  const userDataPath = app.getPath('userData');
+
+  // FIXED: Use process.execPath (Electron) instead of 'node'
+  // FIXED: Add ELECTRON_RUN_AS_NODE environment variable
+  backendProcess = spawn(process.execPath, [backendPath, SECRET_TOKEN, userDataPath], {
+    cwd: path.join(__dirname, '../backend'), 
+    env: { 
+      ...process.env, 
+      ELECTRON_RUN_AS_NODE: '1' 
+    },
+    stdio: 'inherit'
+  });
+
+  backendProcess.on('error', (err) => {
+    console.error('Failed to start backend process:', err);
+  });
+}
+app.whenReady().then(async () => {
+  startBackend();
+  const mainWindow = createWindow();
+
+  ipcMain.handle('get-secret-token', (event) => {
+    if (event.sender === mainWindow.webContents) return SECRET_TOKEN;
+    return null;
+  });
+  
+  ipcMain.handle('dialog:open-file', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog();
+    return canceled ? null : filePaths[0];
+  });
+
+  ipcMain.handle('dialog:save-file', async (event, options) => {
+    const { canceled, filePath } = await dialog.showSaveDialog(options);
+    return canceled ? null : filePath;
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('quit', () => {
+  if (backendProcess) backendProcess.kill();
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+```
+
+```js
+// electron\preload.js
+const { contextBridge, ipcRenderer } = require('electron');
+
+// We define constants here to avoid "module not found" errors with relative paths during dev
+const IPC_CHANNELS = {
+  // File operations
+  FILE_SELECT: 'file:select',
+  FILE_ENCRYPT: 'file:encrypt',
+  FILE_DECRYPT: 'file:decrypt',
+  // Database
+  DB_GET_KEYS: 'db:get-keys',
+  DB_SAVE_KEY: 'db:save-key',
+  DB_DELETE_KEY: 'db:delete-key',
+  DB_GET_PEERS: 'db:get-peers',
+  DB_ADD_PEER: 'db:add-peer',
+  // P2P
+  P2P_CREATE_SEED: 'p2p:create-seed',
+  P2P_SEND_FILE: 'p2p:send-file',
+  // Notifications
+  NOTIFY_USER: 'notify:user',
+  NOTIFY_PROGRESS: 'notify:progress',
+};
+
+contextBridge.exposeInMainWorld('nativeAPI', {
+  // Security
+  getSecretToken: () => ipcRenderer.invoke('get-secret-token'),
+  
+  // Dialogs
+  selectFile: () => ipcRenderer.invoke('dialog:open-file'),
+  showSaveDialog: (options) => ipcRenderer.invoke('dialog:save-file', options),
+
+  // Events
+  onProgress: (callback) => ipcRenderer.on(IPC_CHANNELS.NOTIFY_PROGRESS, (_event, value) => callback(value)),
+  onNotification: (callback) => ipcRenderer.on(IPC_CHANNELS.NOTIFY_USER, (_event, value) => callback(value)),
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+});
+```
+
+```text
+// frontend\.gitignore
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+```
+
+```js
+// frontend\eslint.config.js
+import js from '@eslint/js'
+import globals from 'globals'
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+
+export default [
+  { ignores: ['dist'] },
+  {
+    files: ['**/*.{js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    settings: { react: { version: '18.3' } },
+    plugins: {
+      react,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...react.configs.recommended.rules,
+      ...react.configs['jsx-runtime'].rules,
+      ...reactHooks.configs.recommended.rules,
+      'react/jsx-no-target-blank': 'off',
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  },
+]
+```
+
+```html
+// frontend\index.html
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  
+  <meta http-equiv="Content-Security-Policy" 
+  content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:5173 http://localhost:4000">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Vite + React + Electron Template</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>
+```
+
+```json
+// frontend\package.json
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.1.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-draggable": "^4.4.6",
+    "react-resizable": "^3.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "postcss": "^8.5.5",
+    "tailwindcss": "^4.1.10",
+    "vite": "^6.0.5"
+  }
+}
+```
+
+```js
+// frontend\postcss.config.js
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  }
+}
+```
+
+```js
+// frontend\tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+```js
+// frontend\vite.config.js
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  base: "./", // Ensures correct file paths in production
+  plugins: [react()],
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  },
+});
+```
+
+```js
+// frontend\src\api.js
+// frontend/src/api.js
+const API_URL = 'http://localhost:4000/api';
+let SECRET_TOKEN = null;
+
+/*export async function initializeApi() {
+  // Check if nativeAPI exists (it might not if preload failed)
+  if (!window.nativeAPI) {
+    console.error("CRITICAL: window.nativeAPI is undefined. Preload script failed.");
+    return;
+  }
+  
+  if (!SECRET_TOKEN) {
+    try {
+      SECRET_TOKEN = await window.nativeAPI.getSecretToken();
+      console.log("API Initialized with Token");
+    } catch (e) {
+      console.error("Failed to get secret token:", e);
+    }
+  }
+}*/
+
+export async function initializeApi() {
+  // Ensure we look for nativeAPI, not electronAPI
+  if (window.nativeAPI) {
+    SECRET_TOKEN = await window.nativeAPI.getSecretToken();
+  } else {
+    console.error("nativeAPI not found. Preload failed?");
+  }
+}
+
+async function apiFetch(endpoint, options = {}) {
+  if (!SECRET_TOKEN) {
+    // Attempt to init if missing (e.g., hot reload)
+    await initializeApi(); 
+    if(!SECRET_TOKEN) throw new Error('API is not initialized. Token missing.');
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${SECRET_TOKEN}`,
+    ...options.headers,
+  };
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+// Exports
+export const getKeys = () => apiFetch('/keys');
+export const saveKey = (keyData) => apiFetch('/keys', { method: 'POST', body: JSON.stringify(keyData) });
+export const deleteKey = (keyId) => apiFetch(`/keys/${keyId}`, { method: 'DELETE' });
+export const getPeers = () => apiFetch('/peers');
+export const addPeer = (peerName, seedFilePath) => apiFetch('/peers', { method: 'POST', body: JSON.stringify({ peerName, seedFilePath }) });
+
+export async function encryptFile(filePath, keyConfig, intensity) {
+  const savePath = await window.nativeAPI.showSaveDialog({ defaultPath: `${filePath}.nasm` });
+  if (!savePath) return { success: false, error: 'User cancelled save.' };
+  return apiFetch('/encrypt', { method: 'POST', body: JSON.stringify({ filePath, keyConfig, intensity, savePath }) });
+}
+
+export async function decryptFile(filePath, keyConfig) {
+  const originalName = filePath.endsWith('.nasm') ? filePath.slice(0, -5) : `${filePath}.decrypted`;
+  const savePath = await window.nativeAPI.showSaveDialog({ defaultPath: originalName });
+  if (!savePath) return { success: false, error: 'User cancelled save.' };
+  return apiFetch('/decrypt', { method: 'POST', body: JSON.stringify({ filePath, keyConfig, savePath }) });
+}
+
+export const selectFile = () => window.nativeAPI.selectFile();
+```
+
+```jsx
+// frontend\src\App.jsx
+import React, { useState, useEffect } from 'react';
+import { initializeApi } from './api';
+import Canvas from './components/Canvas';
+import WindowFrame from './components/WindowFrame';
+import CryptoApp from './apps/CryptoApp';
+import TasksApp from './apps/TasksApp';
+import ShortcutWidget from './components/ShortcutWidget';
+import SettingsApp from './apps/SettingsApp';
+import CommandPalette from './components/CommandPalette';
+
+function App() {
+  const [openApps, setOpenApps] = useState([]);
+  const [isReady, setIsReady] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilters, setActiveFilters] = useState([]); 
+  const [availableTags, setAvailableTags] = useState([]); 
+  
+  // Settings & Theme
+  const [shortcuts, setShortcuts] = useState([]);
+  const [theme, setTheme] = useState({ canvas_bg: '#242424' });
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+
+  // --- INITIALIZATION ---
+  const fetchTags = async () => {
+     try {
+         const token = await window.nativeAPI.getSecretToken();
+         const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+         const data = await res.json();
+         const tags = new Set();
+         data.notes.forEach(n => n.tags.forEach(t => tags.add(t.name)));
+         setAvailableTags(Array.from(tags));
+     } catch(e) { console.error("Tag fetch error", e); }
+  };
+
+  const refreshConfig = async () => {
+      const token = await window.nativeAPI.getSecretToken();
+      // Load Shortcuts
+      const sRes = await fetch('http://localhost:4000/api/shortcuts', { headers: { 'Authorization': `Bearer ${token}` } });
+      setShortcuts(await sRes.json());
+      // Load Settings
+      const tRes = await fetch('http://localhost:4000/api/settings', { headers: { 'Authorization': `Bearer ${token}` } });
+      const tData = await tRes.json();
+      if (tData.canvas_bg) setTheme({ canvas_bg: tData.canvas_bg });
+  };
+
+  useEffect(() => {
+    initializeApi().then(() => {
+       setIsReady(true);
+       fetchTags(); 
+       refreshConfig();
+    });
+
+    // Event Listeners
+    const handleToggleApp = (e) => toggleApp(e.detail);
+    window.addEventListener('cognicanvas:data-updated', fetchTags);
+    window.addEventListener('cognicanvas:config-updated', refreshConfig);
+    window.addEventListener('cognicanvas:toggle-app', handleToggleApp);
+    
+    // Command Palette Shortcut
+    const handleKeyDown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            setIsPaletteOpen(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+        window.removeEventListener('cognicanvas:data-updated', fetchTags);
+        window.removeEventListener('cognicanvas:config-updated', refreshConfig);
+        window.removeEventListener('cognicanvas:toggle-app', handleToggleApp);
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const toggleApp = (appName) => {
+    setOpenApps(prev => prev.includes(appName) ? prev.filter(a => a !== appName) : [...prev, appName]);
+  };
+
+  const toggleFilter = (tagName) => {
+    setActiveFilters(prev => prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]);
+  };
+
+  const triggerAddFrame = () => {
+    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
+  };
+
+  if (!isReady) return <div className="bg-[#1a1a1a] h-screen text-yellow-500 flex items-center justify-center font-mono">SYSTEM_BOOT...</div>;
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-[#111] text-gray-100 font-sans select-none">
+      
+      {/* COMMAND PALETTE */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} />
+
+      {/* SIDEBAR DOCK */}
+      <nav className="w-16 bg-black flex flex-col items-center py-4 space-y-4 z-[100] border-r border-white/10">
+        <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black text-xl mb-4">C</div>
+        <DockIcon label="Cryptor" active={openApps.includes('crypto')} onClick={() => toggleApp('crypto')}>🔒</DockIcon>
+        <DockIcon label="Tasks" active={openApps.includes('tasks')} onClick={() => toggleApp('tasks')}>✅</DockIcon>
+        <div className="flex-1" />
+        <DockIcon label="Settings" active={openApps.includes('settings')} onClick={() => toggleApp('settings')}>⚙️</DockIcon>
+      </nav>
+
+      <div className="flex-1 flex flex-col relative">
+        
+        {/* HEADER */}
+        <header className="h-14 bg-[#f8f9fa] border-b border-gray-300 flex items-center px-4 space-x-4 z-40 shadow-sm text-gray-800">
+          <button onClick={triggerAddFrame} className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md active:scale-95 transition-all whitespace-nowrap">
+            + Frame
+          </button>
+          
+          <div className="w-64 relative">
+            <input 
+              type="text" 
+              placeholder="Search content..." 
+              className="w-full bg-[#e9ecef] border-none rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute right-2 top-2 text-xs text-gray-400">Ctrl+K</div>
+          </div>
+
+          <div className="h-8 w-px bg-gray-300 mx-2"></div>
+
+          {/* Tag Filter */}
+          <div className="flex-1 flex items-center space-x-2 overflow-hidden">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tags:</span>
+            <select 
+                className="bg-white border border-gray-300 text-gray-700 text-xs rounded p-1 outline-none focus:border-blue-500"
+                onChange={(e) => { if(e.target.value) { toggleFilter(e.target.value); e.target.value = ""; } }}
+            >
+                <option value="">+ Add Filter</option>
+                {availableTags.map(tag => (
+                    <option key={tag} value={tag}>{tag}</option>
+                ))}
+            </select>
+            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+                {activeFilters.map(tag => (
+                <div key={tag} className="px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-xs font-bold flex items-center whitespace-nowrap">
+                    {tag} <button className="ml-1 text-blue-400 hover:text-blue-900" onClick={() => toggleFilter(tag)}>×</button>
+                </div>
+                ))}
+            </div>
+            {activeFilters.length > 0 && (
+                <button onClick={() => setActiveFilters([])} className="text-xs text-red-500 hover:text-red-700 underline font-bold whitespace-nowrap">Clear</button>
+            )}
+          </div>
+        </header>
+
+       <div className="flex-1 relative z-10">
+          <Canvas 
+            searchQuery={searchQuery} 
+            activeFilters={activeFilters} 
+            showTasks={openApps.includes('tasks')}
+            bgColor={theme.canvas_bg} 
+          />
+          
+          {/* DESKTOP SHORTCUTS */}
+          <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 pointer-events-none">
+            {shortcuts.map(s => (
+                <ShortcutWidget key={s.id} shortcut={s} />
+            ))}
+          </div>
+
+          {/* APP WINDOWS LAYER */}
+          <div className="absolute inset-0 z-50 pointer-events-none">
+            
+            {/* TASKS APP WINDOW */}
+            {openApps.includes('tasks') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="Task Manager" onClose={() => toggleApp('tasks')} width={450} initialPos={{x: 100, y: 100}}>
+                  <TasksApp />
+                </WindowFrame>
+              </div>
+            )}
+
+            {/* CRYPTO APP WINDOW */}
+            {openApps.includes('crypto') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="NASM Cryptor 2.0" onClose={() => toggleApp('crypto')} width={600} initialPos={{x: 150, y: 150}}>
+                  <CryptoApp />
+                </WindowFrame>
+              </div>
+            )}
+            
+            {/* SETTINGS APP WINDOW */}
+            {openApps.includes('settings') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="System Settings" onClose={() => toggleApp('settings')} width={600} initialPos={{x: 200, y: 200}}>
+                  <SettingsApp />
+                </WindowFrame>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const DockIcon = ({ children, label, onClick, active }) => (
+  <button 
+    onClick={onClick}
+    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all group relative
+      ${active ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}
+    `}
+  >
+    {children}
+    <span className="absolute left-14 bg-black text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[110]">
+      {label.toUpperCase()}
+    </span>
+  </button>
+);
+
+export default App;
+```
+
+```css
+// frontend\src\index.css
+@import "tailwindcss";
+
+/* 
+  STEP 2 (Optional but Recommended): This restores the dark background and light text
+  from the original template, but in a non-conflicting way.
+*/
+body {
+    background-color: #242424;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+/* 
+  STEP 3: This is our custom CSS to create the placeholder effect for the
+  editable divs on our notes.
+*/
+[contentEditable="true"]:empty::before {
+    content: attr(data-placeholder);
+    pointer-events: none; /* Lets you click "through" the placeholder */
+    color: #6b7280; /* A slightly darker gray for better contrast on yellow */
+}
+
+/* --- Add this for the resize handle --- */
+.react-resizable-handle {
+    display: block;
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-repeat: no-repeat;
+    background-origin: content-box;
+    background-position: bottom right;
+    padding: 0 4px 4px 0;
+    box-sizing: border-box;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2IDYiIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOiNmZmZmZmYwMCIgeD0iMHB4IiB5PSIwcHgiIGZpbGw9ImJsYWNrIj48ZyBvcGFjaXR5PSIwLjMwMiI+PHBhdGggZD0iTTQgNiA2IDYgNiA0IEwgNCA2IFoiIGZpbGw9ImJsYWNrIi8+PC9nPjwvc3ZnPg==");
+    cursor: se-resize;
+}
+.react-resizable-handle:hover {
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMDAwL3N2ZyIgdmlld0JveD0iMCAwIDYgNiIgc3R5bGU9ImJhY2tncm91bmQtY29sb3I6I2ZmZmZmZjAwIiB4PSIwcHgiIHk9IjBweCIgZmlsbD0iYmxhY2siPjxnIG9wYWNpdHk9IjAuNSI+PHBhdGggZD0iTTQgNiA2IDYgNiA0IEwgNCA2IFoiIGZpbGw9ImJsYWNrIi8+PC9nPjwvc3ZnPg==");
+}
+.react-resizable-handle-sw {
+    bottom: 0;
+    left: 0;
+    cursor: sw-resize;
+    transform: rotate(90deg);
+}
+.react-resizable-handle-se {
+    bottom: 0;
+    right: 0;
+    cursor: se-resize;
+}
+.react-resizable-handle-nw {
+    top: 0;
+    left: 0;
+    cursor: nw-resize;
+    transform: rotate(180deg);
+}
+.react-resizable-handle-ne {
+    top: 0;
+    right: 0;
+    cursor: ne-resize;
+    transform: rotate(270deg);
+}
+.react-resizable-handle-w,
+.react-resizable-handle-e {
+    top: 50%;
+    margin-top: -10px;
+    cursor: ew-resize;
+}
+.react-resizable-handle-w {
+    left: 0;
+    transform: rotate(135deg);
+}
+.react-resizable-handle-e {
+    right: 0;
+    transform: rotate(-45deg);
+}
+.react-resizable-handle-n,
+.react-resizable-handle-s {
+    left: 50%;
+    margin-left: -10px;
+    cursor: ns-resize;
+}
+.react-resizable-handle-n {
+    top: 0;
+    transform: rotate(225deg);
+}
+```
+
+```jsx
+// frontend\src\main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+
+// THIS IS THE FIX: Import the main CSS file which contains the
+// @tailwind directives. This loads all of Tailwind's utility classes.
+import './index.css'; 
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+```
+
+```jsx
+// frontend\src\apps\CryptoApp.jsx
+import React, { useState, useEffect } from 'react';
+
+const TabButton = ({ active, label, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex-1 py-2 text-sm font-bold border-b-2 transition-colors
+      ${active ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+  >
+    {label}
+  </button>
+);
+
+const CryptoApp = () => {
+  const [tab, setTab] = useState('process'); // 'process' or 'vault'
+  const [keys, setKeys] = useState([]);
+  
+  // Process State
+  const [mode, setMode] = useState('encrypt'); // 'encrypt' or 'decrypt'
+  const [selectedKeyId, setSelectedKeyId] = useState('');
+  const [filePath, setFilePath] = useState('');
+  const [intensity, setIntensity] = useState(10);
+  const [status, setStatus] = useState({ msg: '', type: '' });
+
+  // Init
+  useEffect(() => {
+    fetchKeys();
+  }, []);
+
+  const fetchKeys = async () => {
+    try {
+        const token = await window.nativeAPI.getSecretToken();
+        const res = await fetch('http://localhost:4000/api/keys', { headers: { 'Authorization': `Bearer ${token}` } });
+        setKeys(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSelectFile = async () => {
+    const path = await window.nativeAPI.selectFile();
+    if (path) setFilePath(path);
+  };
+
+  const execute = async () => {
+    if (!filePath || !selectedKeyId) {
+        setStatus({ msg: 'Missing File or Key', type: 'error' });
+        return;
+    }
+    
+    setStatus({ msg: 'Processing...', type: 'info' });
+    const token = await window.nativeAPI.getSecretToken();
+    const keyConfig = keys.find(k => k._id === selectedKeyId);
+    
+    // 1. Get Save Path
+    const defaultName = mode === 'encrypt' ? `${filePath}.nasm` : filePath.replace('.nasm', '.dec');
+    const savePath = await window.nativeAPI.showSaveDialog({ defaultPath: defaultName });
+    if (!savePath) {
+        setStatus({ msg: 'Cancelled', type: 'info' });
+        return;
+    }
+
+    // 2. Execute
+    try {
+        const endpoint = mode === 'encrypt' ? '/api/encrypt' : '/api/decrypt';
+        const res = await fetch(`http://localhost:4000${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ filePath, keyConfig, intensity, savePath })
+        });
+        const data = await res.json();
+        
+        if (data.success) setStatus({ msg: `Done! Saved to ${savePath.split(/[/\\]/).pop()}`, type: 'success' });
+        else setStatus({ msg: data.error || 'Failed', type: 'error' });
+    } catch (e) {
+        setStatus({ msg: e.message, type: 'error' });
+    }
+  };
+
+  // --- SUB-COMPONENT: VAULT ---
+  const KeyVault = () => {
+      const [newKeyName, setNewKeyName] = useState("");
+
+      const createKey = async () => {
+          // Simplified Key Gen for UX
+          const newKey = {
+              name: newKeyName || "New Key",
+              d: 2, minBound: 32, maxBound: 126,
+              starts: [10, 20], I: [['a', '+1']], TC: [1, 2] // Default basic NASM config
+          };
+          const token = await window.nativeAPI.getSecretToken();
+          await fetch('http://localhost:4000/api/keys', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify(newKey)
+          });
+          setNewKeyName("");
+          fetchKeys();
+      };
+
+      const deleteKey = async (id) => {
+          const token = await window.nativeAPI.getSecretToken();
+          await fetch(`http://localhost:4000/api/keys/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+          fetchKeys();
+      };
+
+      return (
+          <div className="space-y-4">
+              <div className="flex gap-2">
+                  <input 
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                    placeholder="Key Name..." 
+                    value={newKeyName} 
+                    onChange={e => setNewKeyName(e.target.value)}
+                  />
+                  <button onClick={createKey} className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold">Generate</button>
+              </div>
+              <div className="space-y-2 h-48 overflow-y-auto pr-1">
+                  {keys.map(k => (
+                      <div key={k._id} className="flex justify-between items-center bg-gray-800 p-2 rounded border border-gray-700">
+                          <div>
+                              <div className="text-white font-bold text-sm">{k.name}</div>
+                              <div className="text-xs text-gray-500 font-mono">NASM-d{k.d}</div>
+                          </div>
+                          <button onClick={() => deleteKey(k._id)} className="text-red-400 hover:text-red-300 text-xs font-bold">DEL</button>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      );
+  };
+
+  return (
+    <div className="bg-gray-900 text-gray-200 h-full flex flex-col">
+        {/* Tabs */}
+        <div className="flex border-b border-gray-700">
+            <TabButton active={tab === 'process'} label="PROCESSOR" onClick={() => setTab('process')} />
+            <TabButton active={tab === 'vault'} label="KEY VAULT" onClick={() => setTab('vault')} />
+        </div>
+
+        {/* Content */}
+        <div className="p-4 flex-1 overflow-y-auto">
+            {tab === 'vault' ? <KeyVault /> : (
+                <div className="space-y-5">
+                    {/* 1. Mode Select */}
+                    <div className="flex bg-gray-800 rounded p-1">
+                        <button 
+                            onClick={() => setMode('encrypt')} 
+                            className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${mode === 'encrypt' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            ENCRYPT
+                        </button>
+                        <button 
+                            onClick={() => setMode('decrypt')} 
+                            className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${mode === 'decrypt' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            DECRYPT
+                        </button>
+                    </div>
+
+                    {/* 2. File Input */}
+                    <div 
+                        onClick={handleSelectFile}
+                        className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-800 transition-colors"
+                    >
+                        <div className="text-2xl mb-1">📄</div>
+                        <div className="text-sm font-bold text-gray-300 truncate">
+                            {filePath ? filePath.split(/[/\\]/).pop() : "Click to select file"}
+                        </div>
+                        <div className="text-xs text-gray-500">{filePath || "No file selected"}</div>
+                    </div>
+
+                    {/* 3. Key Select */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">Select Key</label>
+                        <select 
+                            value={selectedKeyId}
+                            onChange={(e) => setSelectedKeyId(e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-600 text-white text-sm rounded p-2 mt-1 outline-none focus:border-blue-500"
+                        >
+                            <option value="">-- Choose Key --</option>
+                            {keys.map(k => <option key={k._id} value={k._id}>{k.name}</option>)}
+                        </select>
+                    </div>
+
+                    {/* 4. Intensity (Encrypt Only) */}
+                    {mode === 'encrypt' && (
+                        <div>
+                            <div className="flex justify-between text-xs font-bold text-gray-500 uppercase">
+                                <span>Time Intensity</span>
+                                <span>{intensity}x</span>
+                            </div>
+                            <input 
+                                type="range" min="1" max="100" 
+                                value={intensity} 
+                                onChange={(e) => setIntensity(parseInt(e.target.value))}
+                                className="w-full mt-1 accent-red-500"
+                            />
+                        </div>
+                    )}
+
+                    {/* 5. Action */}
+                    <button 
+                        onClick={execute}
+                        className={`w-full py-3 rounded font-bold text-white shadow-lg transition-transform active:scale-95
+                            ${mode === 'encrypt' ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'}`}
+                    >
+                        {mode === 'encrypt' ? 'LOCK FILE' : 'UNLOCK FILE'}
+                    </button>
+
+                    {/* Status */}
+                    {status.msg && (
+                        <div className={`text-xs text-center p-2 rounded ${status.type === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`}>
+                            {status.msg}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    </div>
+  );
+};
+
+export default CryptoApp;
+```
+
+```jsx
+// frontend\src\apps\SettingsApp.jsx
+import React, { useState, useEffect } from 'react';
+
+const SettingsApp = () => {
+  const [activeTab, setActiveTab] = useState('shortcuts');
+  const [shortcuts, setShortcuts] = useState([]);
+  const [canvasColor, setCanvasColor] = useState('#242424');
+
+  // --- SHORTCUTS LOGIC ---
+  const fetchShortcuts = async () => {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/shortcuts', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      setShortcuts(data || []);
+      // Trigger App to reload widgets
+      window.dispatchEvent(new CustomEvent('cognicanvas:config-updated'));
+  };
+
+  const handleAddShortcut = async () => {
+      // 1. Ask User for File
+      const filePath = await window.nativeAPI.selectFile();
+      if (!filePath) return;
+
+      // 2. Guess Name
+      const name = filePath.split(/[/\\]/).pop();
+
+      // 3. Save to DB
+      const token = await window.nativeAPI.getSecretToken();
+      await fetch('http://localhost:4000/api/shortcuts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ title: name, target: filePath, type: 'file' })
+      });
+      fetchShortcuts();
+  };
+
+  const handleDeleteShortcut = async (id) => {
+      const token = await window.nativeAPI.getSecretToken();
+      await fetch(`http://localhost:4000/api/shortcuts/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+      fetchShortcuts();
+  };
+
+  // --- THEME LOGIC ---
+  const saveTheme = async (color) => {
+      setCanvasColor(color);
+      const token = await window.nativeAPI.getSecretToken();
+      await fetch('http://localhost:4000/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ key: 'canvas_bg', value: color })
+      });
+      window.dispatchEvent(new CustomEvent('cognicanvas:config-updated'));
+  };
+
+  useEffect(() => {
+      fetchShortcuts();
+      // Fetch initial theme (could be refactored into a hook)
+  }, []);
+
+  return (
+    <div className="flex h-full text-gray-800">
+      {/* Sidebar */}
+      <div className="w-1/4 bg-gray-100 border-r p-2 space-y-1">
+          <button onClick={() => setActiveTab('shortcuts')} className={`w-full text-left px-2 py-1.5 rounded text-sm font-bold ${activeTab==='shortcuts' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-200'}`}>Shortcuts</button>
+          <button onClick={() => setActiveTab('theme')} className={`w-full text-left px-2 py-1.5 rounded text-sm font-bold ${activeTab==='theme' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-200'}`}>Theme</button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-4 overflow-y-auto">
+          {activeTab === 'shortcuts' && (
+              <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                      <h3 className="font-bold">System Shortcuts</h3>
+                      <button onClick={handleAddShortcut} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-500">+ Add File/Exe</button>
+                  </div>
+                  <div className="space-y-2">
+                      {shortcuts.map(s => (
+                          <div key={s.id} className="flex justify-between items-center bg-white border p-2 rounded shadow-sm">
+                              <div className="truncate flex-1 pr-2">
+                                  <div className="font-bold text-sm">{s.title}</div>
+                                  <div className="text-xs text-gray-400 truncate" title={s.target}>{s.target}</div>
+                              </div>
+                              <button onClick={() => handleDeleteShortcut(s.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">🗑️</button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'theme' && (
+              <div className="space-y-4">
+                  <h3 className="font-bold">Appearance</h3>
+                  <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">CANVAS BACKGROUND</label>
+                      <div className="flex gap-2">
+                          {['#242424', '#1e1e1e', '#0f172a', '#312e81', '#ffffff'].map(c => (
+                              <button 
+                                key={c}
+                                className={`w-8 h-8 rounded-full border-2 ${canvasColor === c ? 'border-blue-500 scale-110' : 'border-transparent'}`}
+                                style={{ backgroundColor: c }}
+                                onClick={() => saveTheme(c)}
+                              />
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
+      </div>
+    </div>
+  );
+};
+
+export default SettingsApp;
+```
+
+```jsx
+// frontend\src\apps\TasksApp.jsx
+// frontend/src/apps/TasksApp.jsx
+import React, { useState, useEffect } from 'react';
+
+const TasksApp = () => {
+  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
+  const [tasks, setTasks] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+
+  // --- HELPERS ---
+  const formatDurationHMS = (ms) => {
+      if (!ms) return "0s";
+      const seconds = Math.floor((ms / 1000) % 60);
+      const minutes = Math.floor((ms / (1000 * 60)) % 60);
+      const hours = Math.floor((ms / (1000 * 60 * 60)));
+
+      const parts = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+      
+      return parts.join(' ');
+  };
+
+  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  // --- API FETCHING ---
+  const fetchTasks = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch (e) { console.error("Fetch tasks failed", e); }
+  };
+
+  const fetchHistory = async () => {
+      try {
+        const token = await window.nativeAPI.getSecretToken();
+        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        setHistory(data || []);
+      } catch (e) { console.error("Fetch history failed", e); }
+  };
+
+  // --- LIFECYCLE ---
+  useEffect(() => {
+    // Initial Load
+    fetchTasks();
+    fetchHistory();
+
+    // Listen for widget updates (start/stop on canvas) to refresh this list
+    const handleRefresh = () => {
+        fetchTasks();
+        if (tab !== 'active') fetchHistory();
+    };
+    window.addEventListener('cognicanvas:data-updated', handleRefresh);
+    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
+  }, [tab]);
+
+  // --- HANDLERS ---
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ title: newTaskTitle })
+    });
+    setNewTaskTitle("");
+    fetchTasks();
+    // Notify Canvas to spawn widget
+    window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+  };
+
+  // --- RENDERERS ---
+  const renderActive = () => (
+    <>
+        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
+            <input 
+                type="text" 
+                className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                placeholder="New Task Name..." 
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                autoFocus
+            />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">
+                Add
+            </button>
+        </form>
+
+        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            {tasks.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No active tasks.</p>}
+            {tasks.map(task => (
+                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
+                    <div>
+                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">
+                            {task.title}
+                            {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono mt-1">
+                            Total: {formatDurationHMS(task.total_time_ms)}
+                        </div>
+                    </div>
+                    {task.is_running && <span className="text-[10px] font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900">RUNNING</span>}
+                </div>
+            ))}
+        </div>
+    </>
+  );
+
+  const renderHistory = () => (
+      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+          {history.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No session history found.</p>}
+          {history.map(log => (
+              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
+                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                      <div className="text-xs text-gray-400 font-mono">
+                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
+                      </div>
+                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
+                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
+                      </div>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderCalendar = () => {
+      // Logic: Generate last 28 days
+      const days = [];
+      const today = new Date();
+      // Reset to start of day for accurate comparison
+      today.setHours(0,0,0,0);
+
+      for(let i=27; i>=0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toLocaleDateString();
+          
+          // Aggregate Logs
+          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
+          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
+          
+          let colorClass = 'bg-gray-800 border-gray-700';
+          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
+          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
+          if(totalMs > 14400000) colorClass = 'bg-green-500 border-green-400'; // > 4h
+
+          days.push(
+              <div key={i} className={`h-8 w-8 rounded ${colorClass} border flex items-center justify-center text-[10px] relative group cursor-help transition-all hover:scale-110`}>
+                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
+                  
+                  {/* Tooltip */}
+                  {totalMs > 0 && (
+                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap hidden group-hover:block z-50 border border-gray-600 shadow-xl">
+                          {formatDurationHMS(totalMs)}
+                      </div>
+                  )}
+              </div>
+          );
+      }
+
+      return (
+          <div className="p-2">
+              <div className="flex justify-between items-baseline mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
+                  <span className="text-[10px] text-gray-500">Last 28 Days</span>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                  {days}
+              </div>
+              <div className="mt-4 flex gap-2 justify-center text-[10px] text-gray-500">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-gray-800 rounded"></div> 0m</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-900/60 rounded"></div> &lt;1h</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-700 rounded"></div> &gt;1h</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded"></div> &gt;4h</span>
+              </div>
+          </div>
+      );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
+      {/* Custom Tab Bar */}
+      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
+          {['active', 'history', 'calendar'].map(t => (
+            <button 
+                key={t}
+                onClick={() => setTab(t)} 
+                className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all
+                    ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
+                `}
+            >
+                {t}
+            </button>
+          ))}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0">
+        {tab === 'active' && renderActive()}
+        {tab === 'history' && renderHistory()}
+        {tab === 'calendar' && renderCalendar()}
+      </div>
+    </div>
+  );
+};
+
+export default TasksApp;
+
+/**COMPLEMENTARY CODE FOR FUTUR UNIFICATION. BUT IT WAS SOMEWHY INCOMPLETE SO ADDED HERE TO NOT LOOSE ANYTHING
+ * 
+ * import React, { useState, useEffect } from 'react';
+
+const TasksApp = () => {
+  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
+  const [tasks, setTasks] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  // NEW: State for selected day details
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const formatDurationHMS = (ms) => {
+      if (!ms) return "0s";
+      const seconds = Math.floor((ms / 1000) % 60);
+      const minutes = Math.floor((ms / (1000 * 60)) % 60);
+      const hours = Math.floor((ms / (1000 * 60 * 60)));
+      const parts = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+      return parts.join(' ');
+  };
+
+  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  const fetchTasks = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch (e) { console.error("Fetch tasks failed", e); }
+  };
+
+  const fetchHistory = async () => {
+      try {
+        const token = await window.nativeAPI.getSecretToken();
+        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        setHistory(data || []);
+      } catch (e) { console.error("Fetch history failed", e); }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+    fetchHistory();
+    const handleRefresh = () => { fetchTasks(); if (tab !== 'active') fetchHistory(); };
+    window.addEventListener('cognicanvas:data-updated', handleRefresh);
+    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
+  }, [tab]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ title: newTaskTitle }) });
+    setNewTaskTitle("");
+    fetchTasks();
+    window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+  };
+
+  // --- RENDERERS ---
+  const renderActive = () => (
+    <>
+        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
+            <input type="text" className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="New Task Name..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} autoFocus />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">Add</button>
+        </form>
+        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            {tasks.map(task => (
+                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
+                    <div>
+                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">{task.title} {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}</div>
+                        <div className="text-xs text-gray-400 font-mono mt-1">Total: {formatDurationHMS(task.total_time_ms)}</div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </>
+  );
+
+  const renderHistoryList = (list) => (
+      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+          {list.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No records found.</p>}
+          {list.map(log => (
+              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
+                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                      <div className="text-xs text-gray-400 font-mono">
+                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
+                      </div>
+                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
+                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
+                      </div>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderCalendar = () => {
+      // Logic: Generate last 28 days
+      const days = [];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      for(let i=27; i>=0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toLocaleDateString();
+          
+          // Find logs for this specific day
+          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
+          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
+          
+          let colorClass = 'bg-gray-800 border-gray-700';
+          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
+          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
+          
+          const isSelected = selectedDate === dateStr;
+
+          days.push(
+              <div 
+                key={i} 
+                className={`h-8 w-8 rounded border flex items-center justify-center text-[10px] relative cursor-pointer transition-all hover:scale-110 
+                    ${colorClass} ${isSelected ? 'ring-2 ring-white scale-110 z-10' : ''}`}
+                onClick={() => setSelectedDate(dateStr)}
+              >
+                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
+              </div>
+          );
+      }
+
+      // Filter history for selected date
+      const selectedLogs = selectedDate 
+        ? history.filter(h => new Date(h.start_time).toLocaleDateString() === selectedDate)
+        : [];
+
+      return (
+          <div className="p-2 h-full flex flex-col">
+              <div className="flex justify-between items-baseline mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
+                  <span className="text-[10px] text-gray-500">Click a day to view details</span>
+              </div>
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                  {days}
+              </div>
+              
+              // Day Details View 
+              <div className="flex-1 min-h-0 border-t border-gray-700 pt-2">
+                  <h4 className="text-xs font-bold text-white mb-2">
+                      {selectedDate ? `Activity for ${selectedDate}` : "Select a day above"}
+                  </h4>
+                  {selectedDate && renderHistoryList(selectedLogs)}
+              </div>
+          </div>
+      );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
+      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
+          {['active', 'history', 'calendar'].map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+                {t}
+            </button>
+          ))}
+      </div>
+      <div className="flex-1 min-h-0">
+        {tab === 'active' && renderActive()}
+        {tab === 'history' && renderHistoryList(history)}
+        {tab === 'calendar' && renderCalendar()}
+      </div>
+    </div>
+  );
+};
+
+export default TasksApp;
+ * 
+ * 
+ * 
+ */
+```
+
+```jsx
+// frontend\src\components\Canvas.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import Note from './Note';
+import Frame from './Frame';
+import TaskWidget from './TaskWidget';
+
+
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424' }) => {
+  const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const containerRef = useRef(null);
+  const [, forceUpdate] = useState(0); // Trigger re-render for refs
+
+  const setView = (newView) => {
+      viewRef.current = { ...viewRef.current, ...newView };
+      forceUpdate(n => n + 1);
+  };
+
+  const fetchData = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const json = await res.json();
+      setData(json);
+      window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  // --- LOGIC: Filter Matching ---
+  const getFilterMatch = (item) => {
+      // Generic filter that works for Notes AND Tasks
+      const contentStr = (item.content || item.title || "").toLowerCase();
+      const normSearch = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || contentStr.includes(normSearch);
+      
+      const matchesTags = activeFilters.length === 0 || 
+        (item.tags && item.tags.some(tag => activeFilters.includes(tag.name)));
+
+      return matchesSearch && matchesTags;
+  };
+
+  
+
+  const tasksToRender = data.tasks.map(task => {
+      const isMatch = getFilterMatch(task);
+      // Don't show filtered-out tasks at all, or show them dimmed? 
+      // Users usually want to find tasks, so hiding non-matches is better.
+      if (!isMatch && (searchQuery || activeFilters.length > 0)) return null;
+
+      return (
+         <TaskWidget 
+            key={task.id} 
+            task={task} 
+            scale={viewRef.current.scale} 
+            onUpdate={fetchData} 
+            onDelete={async (id) => {
+                // We actually don't want to delete tasks easily from widget, 
+                // but if needed we can add logic here. 
+                // For now, we rely on the widget's internal 'terminate' logic if we add it.
+            }}
+         />
+      );
+  }).filter(Boolean);
+
+  
+
+  useEffect(() => { 
+    fetchData(); 
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Native Wheel Handler for smooth zoom
+    const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const worldX = (mouseX - current.x) / current.scale;
+      const worldY = (mouseY - current.y) / current.scale;
+
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+
+      const newX = mouseX - (worldX * newScale);
+      const newY = mouseY - (worldY * newScale);
+
+      setView({ x: newX, y: newY, scale: newScale });
+    };
+
+    container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheelNative);
+  }, []);
+
+  // --- CAMERA TELEPORT ---
+  const focusOnItem = (type, id) => {
+      let target = null;
+      const itemId = parseInt(id);
+
+      if (type === 'note') target = data.notes.find(n => n.id === itemId);
+      else if (type === 'frame') target = data.frames.find(f => f.id === itemId);
+
+      if (target) {
+          const targetCenterX = target.pos_x + (target.width / 2);
+          const targetCenterY = target.pos_y + (target.height / 2);
+
+          const canvasWidth = containerRef.current?.clientWidth || window.innerWidth;
+          const canvasHeight = containerRef.current?.clientHeight || window.innerHeight;
+
+          const newScale = 1;
+          const newX = (canvasWidth / 2) - (targetCenterX * newScale);
+          const newY = (canvasHeight / 2) - (targetCenterY * newScale);
+
+          setView({ x: newX, y: newY, scale: newScale });
+      }
+  };
+
+  // --- ACTIONS ---
+  const handleDoubleClick = async (e) => {
+    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const current = viewRef.current;
+    const x = ((e.clientX - rect.left) - current.x) / current.scale;
+    const y = ((e.clientY - rect.top) - current.y) / current.scale;
+
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ content: "New Note", pos_x: x - 100, pos_y: y - 100, width: 200, height: 200, color_hex: "#fff000" })
+    });
+    fetchData();
+  };
+
+  const handleNoteUpdateDrag = async (id, changes) => {
+    let updates = { ...changes };
+    // Check for frame capture if moving
+    if (changes.pos_x !== undefined) {
+        const note = data.notes.find(n => n.id === id);
+        const cx = changes.pos_x + (note.width / 2);
+        const cy = changes.pos_y + (note.height / 2);
+        const parentFrame = data.frames.find(f => !f.is_collapsed && cx >= f.pos_x && cx <= (f.pos_x + f.width) && cy >= f.pos_y && cy <= (f.pos_y + f.height));
+        updates.frame_id = parentFrame ? parentFrame.id : null;
+    }
+    // Optimistic Update
+    setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/notes/${id}`, { 
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+        body: JSON.stringify(updates) 
+    });
+  };
+
+  const handleFrameDrag = (frameId, dx, dy) => {
+    // Synchronous movement of frame + children
+    setData(prev => ({
+      ...prev,
+      frames: prev.frames.map(f => f.id === frameId ? { ...f, pos_x: f.pos_x + dx, pos_y: f.pos_y + dy } : f),
+      notes: prev.notes.map(n => n.frame_id === frameId ? { ...n, pos_x: n.pos_x + dx, pos_y: n.pos_y + dy } : n)
+    }));
+  };
+
+  const handleFrameStop = async (id, finalPos) => {
+    const token = await window.nativeAPI.getSecretToken();
+    // 1. Save Frame
+    await fetch(`http://localhost:4000/api/frames/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(finalPos)
+    });
+    // 2. Save Children
+    const children = data.notes.filter(n => n.frame_id === id);
+    for (const child of children) {
+        await fetch(`http://localhost:4000/api/notes/${child.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ pos_x: child.pos_x, pos_y: child.pos_y })
+        });
+    }
+  };
+
+  const handleUpdateFrame = async (id, changes) => {
+    setData(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/frames/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(changes)
+    });
+  };
+
+  const handleTagAction = async (action, type, id, tagName) => {
+    const token = await window.nativeAPI.getSecretToken();
+    const url = action === 'add' ? `http://localhost:4000/api/tags/${type}/${id}` : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
+    await fetch(url, { method: action === 'add' ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
+    fetchData();
+  };
+
+  // Re-declare for brevity in this snippet
+  const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+      setView({ scale: newScale }); // Simple zoom for brevity
+  };
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container?.removeEventListener('wheel', handleWheelNative);
+  }, []);
+
+  useEffect(() => {
+    const onAddFrame = async () => {
+        const token = await window.nativeAPI.getSecretToken();
+        const current = viewRef.current;
+        const newFrame = { 
+            title: "NEW FRAME", 
+            pos_x: (-current.x + 100) / current.scale, 
+            pos_y: (-current.y + 100) / current.scale, 
+            width: 400, 
+            height: 300 
+        };
+        await fetch('http://localhost:4000/api/frames', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newFrame) });
+        fetchData();
+    };
+    window.addEventListener('cognicanvas:add-frame', onAddFrame);
+    return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
+  }, []);
+  const notesToRender = data.notes.map(note => {
+      if (note.frame_id) {
+          const parent = data.frames.find(f => f.id === note.frame_id);
+          if (parent && parent.is_collapsed) return null;
+      }
+      
+      const isMatch = getFilterMatch(note);
+      const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
+
+      return (
+          <Note 
+            key={note.id} note={note} scale={viewRef.current.scale} isDimmed={isDimmed} 
+            onNoteUpdate={handleNoteUpdateDrag}
+            onNoteDelete={async (id) => {
+                await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                fetchData();
+            }}
+            onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
+            onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
+            onDataChange={fetchData}
+            onNavigate={focusOnItem} 
+          />
+      );
+  }).filter(Boolean);
+   return (
+    <div 
+        ref={containerRef}
+        onDoubleClick={handleDoubleClick}
+        onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) setIsPanning(true); }}
+        onMouseMove={(e) => { if(isPanning) setView({ x: viewRef.current.x + e.movementX, y: viewRef.current.y + e.movementY }); }}
+        onMouseUp={() => setIsPanning(false)}
+        className="w-full h-full overflow-hidden relative cursor-default"
+        style={{ backgroundColor: bgColor }}
+    >
+      <div 
+        id="transform-layer"
+        style={{ 
+            transform: `translate(${viewRef.current.x}px, ${viewRef.current.y}px) scale(${viewRef.current.scale})`, 
+            transformOrigin: '0 0',
+            position: 'absolute',
+            width: '100%', height: '100%',
+            pointerEvents: 'none' 
+        }}
+      >
+          {/* GRID */}
+          <div className="absolute opacity-10 top-[-200000px] left-[-200000px] w-[400000px] h-[400000px] pointer-events-none"
+             style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
+          />
+
+          <div className="pointer-events-auto">
+            {data.frames.map(frame => (
+                <Frame 
+                    key={frame.id} frame={frame} scale={viewRef.current.scale} 
+                    onUpdate={handleUpdateFrame} 
+                    onDelete={async (id) => {
+                        await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                        fetchData();
+                    }}
+                    onDrag={handleFrameDrag}
+                    onDragStop={handleFrameStop}
+                />
+            ))}
+            
+            {notesToRender}
+            
+            {/* TASK WIDGETS */}
+            {showTasks && tasksToRender}
+          </div>
+      </div>
+      
+      {/* HUD Info */}
+      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-mono select-none pointer-events-none">
+          {Math.round(viewRef.current.scale * 100)}% | {Math.round(viewRef.current.x)},{Math.round(viewRef.current.y)}
+      </div>
+    </div>
+  );
+};
+
+export default Canvas;
+/**
+ * TO BE COMPLETED WITH THIS COMPLEMENTARY BUT SOMEWHY INCOMPLETE CODE
+ * 
+ * import React, { useState, useEffect, useRef } from 'react';
+import Note from './Note';
+import Frame from './Frame';
+import TaskWidget from './TaskWidget';
+
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424' }) => {
+  const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const containerRef = useRef(null);
+  const [, forceUpdate] = useState(0);
+
+  const setView = (newView) => {
+      viewRef.current = { ...viewRef.current, ...newView };
+      forceUpdate(n => n + 1);
+  };
+
+  const fetchData = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const json = await res.json();
+      setData(json);
+      window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+    } catch (e) { console.error("Canvas Fetch Error:", e); }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  // --- FILTER LOGIC ---
+  const getFilterMatch = (item) => {
+      const contentStr = (item.content || item.title || "").toLowerCase();
+      const normSearch = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || contentStr.includes(normSearch);
+      const matchesTags = activeFilters.length === 0 || (item.tags && item.tags.some(tag => activeFilters.includes(tag.name)));
+      return matchesSearch && matchesTags;
+  };
+
+  // --- RENDER PREPARATION ---
+  const notesToRender = data.notes.map(note => {
+      if (note.frame_id) {
+          const parent = data.frames.find(f => f.id === note.frame_id);
+          if (parent && parent.is_collapsed) return null;
+      }
+      const isMatch = getFilterMatch(note);
+      const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
+
+      return (
+          <Note 
+            key={note.id} note={note} scale={viewRef.current.scale} isDimmed={isDimmed} 
+            onNoteUpdate={handleNoteUpdateDrag}
+            onNoteDelete={async (id) => {
+                await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                fetchData();
+            }}
+            onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
+            onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
+            onDataChange={fetchData}
+            onNavigate={focusOnItem} 
+          />
+      );
+  }).filter(Boolean);
+
+  // HUD ITEMS (TASKS)
+  const tasksToRender = data.tasks.map(task => {
+      // Logic: Show task if it matches filter, OR if no filters are active.
+      if ((searchQuery || activeFilters.length > 0) && !getFilterMatch(task)) return null;
+      return (
+         <TaskWidget 
+            key={task.id} 
+            task={task} 
+            // SCALE: We pass 1 because HUD shouldn't scale with zoom, or pass viewRef.scale if you want them to zoom too. 
+            // Usually HUD is fixed size (scale=1).
+            scale={1} 
+            onUpdate={fetchData} 
+         />
+      );
+  }).filter(Boolean);
+
+  // --- HANDLERS (Copy from previous correct version) ---
+  const focusOnItem = (type, id) => {
+      let target = null;
+      const itemId = parseInt(id);
+      if (type === 'note') target = data.notes.find(n => n.id === itemId);
+      else if (type === 'frame') target = data.frames.find(f => f.id === itemId);
+
+      if (target) {
+          const targetCenterX = target.pos_x + (target.width / 2);
+          const targetCenterY = target.pos_y + (target.height / 2);
+          const canvasWidth = containerRef.current?.clientWidth || window.innerWidth;
+          const canvasHeight = containerRef.current?.clientHeight || window.innerHeight;
+          const newX = (canvasWidth / 2) - (targetCenterX * 1);
+          const newY = (canvasHeight / 2) - (targetCenterY * 1);
+          setView({ x: newX, y: newY, scale: 1 });
+      }
+  };
+
+  const handleNoteUpdateDrag = async (id, changes) => {
+    let updates = { ...changes };
+    if (changes.pos_x !== undefined) {
+        const note = data.notes.find(n => n.id === id);
+        const cx = changes.pos_x + (note.width / 2);
+        const cy = changes.pos_y + (note.height / 2);
+        const parentFrame = data.frames.find(f => !f.is_collapsed && cx >= f.pos_x && cx <= (f.pos_x + f.width) && cy >= f.pos_y && cy <= (f.pos_y + f.height));
+        updates.frame_id = parentFrame ? parentFrame.id : null;
+    }
+    setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(updates) });
+  };
+  
+  const handleFrameDrag = (frameId, dx, dy) => {
+    setData(prev => ({
+      ...prev,
+      frames: prev.frames.map(f => f.id === frameId ? { ...f, pos_x: f.pos_x + dx, pos_y: f.pos_y + dy } : f),
+      notes: prev.notes.map(n => n.frame_id === frameId ? { ...n, pos_x: n.pos_x + dx, pos_y: n.pos_y + dy } : n)
+    }));
+  };
+
+  const handleFrameStop = async (id, finalPos) => {
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(finalPos) });
+    const children = data.notes.filter(n => n.frame_id === id);
+    for (const child of children) {
+        await fetch(`http://localhost:4000/api/notes/${child.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ pos_x: child.pos_x, pos_y: child.pos_y }) });
+    }
+  };
+
+  const handleUpdateFrame = async (id, changes) => {
+    setData(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(changes) });
+  };
+  
+  const handleTagAction = async (action, type, id, tagName) => {
+    const token = await window.nativeAPI.getSecretToken();
+    const url = action === 'add' ? `http://localhost:4000/api/tags/${type}/${id}` : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
+    await fetch(url, { method: action === 'add' ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
+    fetchData();
+  };
+  
+  const handleDoubleClick = async (e) => {
+    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const current = viewRef.current;
+    const x = ((e.clientX - rect.left) - current.x) / current.scale;
+    const y = ((e.clientY - rect.top) - current.y) / current.scale;
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ content: "New Note", pos_x: x - 100, pos_y: y - 100, width: 200, height: 200, color_hex: "#fff000" }) });
+    fetchData();
+  };
+
+  const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+      setView({ scale: newScale });
+  };
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container?.removeEventListener('wheel', handleWheelNative);
+  }, []);
+  
+  useEffect(() => {
+    const onAddFrame = async () => {
+        const token = await window.nativeAPI.getSecretToken();
+        const current = viewRef.current;
+        const newFrame = { title: "NEW FRAME", pos_x: (-current.x + 100) / current.scale, pos_y: (-current.y + 100) / current.scale, width: 400, height: 300 };
+        await fetch('http://localhost:4000/api/frames', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newFrame) });
+        fetchData();
+    };
+    window.addEventListener('cognicanvas:add-frame', onAddFrame);
+    return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
+  }, []);
+
+   return (
+    <div 
+        ref={containerRef}
+        onDoubleClick={handleDoubleClick}
+        onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) setIsPanning(true); }}
+        onMouseMove={(e) => { if(isPanning) setView({ x: viewRef.current.x + e.movementX, y: viewRef.current.y + e.movementY }); }}
+        onMouseUp={() => setIsPanning(false)}
+        className="w-full h-full overflow-hidden relative cursor-default"
+        style={{ backgroundColor: bgColor }}
+    >
+      // 1. WORLD SPACE (Notes, Frames, Grid) - Moves with Panning/Zooming 
+      <div 
+        id="transform-layer"
+        style={{ 
+            transform: `translate(${viewRef.current.x}px, ${viewRef.current.y}px) scale(${viewRef.current.scale})`, 
+            transformOrigin: '0 0',
+            position: 'absolute',
+            width: '100%', height: '100%',
+            pointerEvents: 'none' 
+        }}
+      >
+          // GRID
+          <div className="absolute opacity-10 top-[-200000px] left-[-200000px] w-[400000px] h-[400000px] pointer-events-none"
+             style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
+          />
+
+          <div className="pointer-events-auto">
+            {data.frames.map(frame => (
+                <Frame 
+                    key={frame.id} frame={frame} scale={viewRef.current.scale} 
+                    onUpdate={handleUpdateFrame} 
+                    onDelete={async (id) => {
+                        await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                        fetchData();
+                    }}
+                    onDrag={handleFrameDrag}
+                    onDragStop={handleFrameStop}
+                />
+            ))}
+            
+            {notesToRender}
+          </div>
+      </div>
+      
+      // 2. HUD SPACE (Fixed UI, Task Widgets) - Does NOT Move/Zoom 
+      <div className="absolute inset-0 pointer-events-none">
+          <div className="pointer-events-auto w-full h-full">
+            {showTasks && tasksToRender}
+          </div>
+      </div>
+
+      // 3. INFO UI
+      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-mono select-none pointer-events-none">
+          {Math.round(viewRef.current.scale * 100)}% | {Math.round(viewRef.current.x)},{Math.round(viewRef.current.y)}
+      </div>
+    </div>
+  );
+};
+export default Canvas;
+ * 
+ * 
+ */
+```
+
+```jsx
+// frontend\src\components\CommandPalette.jsx
+import React, { useState, useEffect, useRef } from 'react';
+
+const CommandPalette = ({ isOpen, onClose, onNavigate }) => {
+  const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef(null);
+
+  // Static Actions
+  const ACTIONS = [
+    { id: 'app:tasks', title: 'Open Tasks', icon: '✅', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'tasks' })) },
+    { id: 'app:crypto', title: 'Open Cryptor', icon: '🔒', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'crypto' })) },
+    { id: 'app:settings', title: 'Open Settings', icon: '⚙️', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'settings' })) },
+    { id: 'canvas:add-frame', title: 'New Frame', icon: 'squares', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:add-frame')) },
+    { id: 'sys:reload', title: 'Reload System', icon: '🔄', action: () => window.location.reload() }
+  ];
+
+  const filteredItems = ACTIONS.filter(item => item.title.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery("");
+      setSelectedIndex(0);
+    }
+  }, [isOpen]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % filteredItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredItems[selectedIndex]) {
+        filteredItems[selectedIndex].action();
+        onClose();
+      }
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[20vh]" onClick={onClose}>
+      <div className="w-[600px] bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100" onClick={e => e.stopPropagation()}>
+        
+        {/* Input */}
+        <div className="flex items-center px-4 py-3 border-b border-gray-700">
+          <span className="text-gray-400 text-lg mr-3">🔍</span>
+          <input 
+            ref={inputRef}
+            type="text" 
+            className="flex-1 bg-transparent text-white text-lg outline-none placeholder-gray-500"
+            placeholder="Type a command..."
+            value={query}
+            onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={handleKeyDown}
+          />
+          <span className="text-xs text-gray-500 border border-gray-600 px-1.5 py-0.5 rounded">ESC</span>
+        </div>
+
+        {/* List */}
+        <div className="max-h-[300px] overflow-y-auto py-2">
+          {filteredItems.length === 0 ? (
+            <div className="px-4 py-3 text-gray-500 text-sm">No results found.</div>
+          ) : (
+            filteredItems.map((item, index) => (
+              <div 
+                key={item.id}
+                className={`px-4 py-3 flex items-center cursor-pointer transition-colors
+                  ${index === selectedIndex ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'}
+                `}
+                onClick={() => { item.action(); onClose(); }}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <span className="mr-3 text-lg">{item.icon}</span>
+                <span className="font-medium">{item.title}</span>
+                {index === selectedIndex && <span className="ml-auto text-xs opacity-70">↵ Enter</span>}
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-[#111] px-4 py-1.5 border-t border-gray-700 text-[10px] text-gray-500 flex justify-between">
+            <span>CogniCanvas OS v1.0</span>
+            <span>Use ↑↓ to navigate</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CommandPalette;
+```
+
+```jsx
+// frontend\src\components\Frame.jsx
+import React, { useRef, useState } from "react";
+import Draggable from "react-draggable";
+import { ResizableBox } from "react-resizable";
+import "react-resizable/css/styles.css";
+
+// DESTUCTURING onDrag HERE is critical to fix your error
+const Frame = ({ frame, onUpdate, onDelete, onDrag, onDragStop, scale }) => {
+    const nodeRef = useRef(null);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+
+    // 1. Handle Dragging (Movement)
+    const handleDrag = (e, data) => {
+        // We pass the ID and the movement deltas to the parent
+        if (onDrag) {
+            onDrag(frame.id, data.deltaX, data.deltaY);
+        }
+    };
+
+    // 2. Handle Stop (Save to DB)
+    const handleStop = (e, data) => {
+        if (onDragStop) {
+            onDragStop(frame.id, { pos_x: data.x, pos_y: data.y });
+        }
+    };
+
+    const handleResizeStop = (e, data) => {
+        onUpdate(frame.id, { width: data.size.width, height: data.size.height });
+    };
+
+    const toggleCollapse = () => {
+        // Toggle the boolean state (0 or 1 for SQLite)
+        onUpdate(frame.id, { is_collapsed: frame.is_collapsed ? 0 : 1 });
+    };
+
+    const handleTitleBlur = (e) => {
+        setIsEditingTitle(false);
+        if (e.target.innerText !== frame.title) {
+            onUpdate(frame.id, { title: e.target.innerText });
+        }
+    };
+
+    return (
+        <Draggable
+            nodeRef={nodeRef}
+            handle=".frame-header"
+            // Use local state position or props position? 
+            // Props position is safer for synchronized movement with children
+            position={{ x: frame.pos_x, y: frame.pos_y }}
+            scale={scale}
+            onDrag={handleDrag} // Fires on every pixel move
+            onStop={handleStop} // Fires when you let go
+        >
+            <div 
+                ref={nodeRef} 
+                className="absolute z-10 transition-opacity duration-200" 
+                style={{ 
+                    width: frame.width, 
+                    height: frame.is_collapsed ? 'auto' : frame.height 
+                }}
+            >
+                <ResizableBox 
+                    width={frame.width} 
+                    height={frame.is_collapsed ? 40 : frame.height} 
+                    onResizeStop={handleResizeStop}
+                    minConstraints={[200, 40]}
+                    axis={frame.is_collapsed ? "x" : "both"}
+                    handle={!frame.is_collapsed && <span className="react-resizable-handle react-resizable-handle-se" />}
+                >
+                    <div className="w-full h-full border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg flex flex-col bg-gray-50 bg-opacity-50">
+                        
+                        {/* HEADER */}
+                        <div className="frame-header h-10 bg-gray-200 flex items-center px-2 cursor-move group rounded-t-lg select-none">
+                            <button onClick={(e) => { e.stopPropagation(); toggleCollapse(); }} className="mr-2 text-gray-500 hover:text-black w-6 h-6 flex items-center justify-center font-bold">
+                                {frame.is_collapsed ? '▶' : '▼'}
+                            </button>
+
+                            <div 
+                                contentEditable
+                                suppressContentEditableWarning
+                                className="flex-grow font-bold text-gray-700 text-sm uppercase tracking-wide focus:outline-none focus:bg-white px-1 rounded cursor-text"
+                                onBlur={handleTitleBlur}
+                                onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                                onMouseDown={(e) => e.stopPropagation()} // Allow clicking text without dragging
+                            >
+                                {frame.title}
+                            </div>
+
+                            <button 
+                                onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    e.stopPropagation(); // <--- THIS FIXES THE CONFLICT
+                                    onDelete(frame.id); 
+                                }} 
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2"
+                                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start on button
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                </ResizableBox>
+            </div>
+        </Draggable>
+    );
+};
+
+export default Frame;
+```
+
+```jsx
+// frontend\src\components\KeyConfigForm.jsx
+// frontend/src/components/KeyConfigForm.jsx
+import React, { useState } from 'react';
+
+// A simple reusable input component.
+const FormInput = ({ label, value, onChange }) => (
+  <label className="block">
+    <span className="text-gray-700">{label}</span>
+    <input type="text" value={value} onChange={onChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+  </label>
+);
+
+// A component for a list of values that can be added/removed.
+const DynamicListInput = ({ label, items, setItems }) => {
+  const handleItemChange = (index, value) => {
+    const newItems = [...items];
+    newItems[index] = value;
+    setItems(newItems);
+  };
+  const addItem = () => setItems([...items, '']);
+  const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
+
+  return (
+    <div>
+      <h3 className="text-lg font-medium">{label}</h3>
+      {items.map((item, index) => (
+        <div key={index} className="flex items-center space-x-2 mt-2">
+          <input type="text" value={item} onChange={(e) => handleItemChange(index, e.target.value)} className="flex-grow rounded-md border-gray-300 shadow-sm" />
+          <button onClick={() => removeItem(index)} className="px-2 py-1 bg-red-500 text-white rounded">-</button>
+        </div>
+      ))}
+      <button onClick={addItem} className="mt-2 px-2 py-1 bg-green-500 text-white rounded">+</button>
+    </div>
+  );
+};
+
+function KeyConfigForm({ initialData, onSave, onCancel }) {
+  const [key, setKey] = useState(initialData || {});
+
+  const handleChange = (field) => (e) => {
+    setKey({ ...key, [field]: e.target.value });
+  };
+  
+  const handleListChange = (field) => (items) => {
+    setKey({ ...key, [field]: items });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // In a real app, perform validation here using a library like Zod.
+    onSave(key);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 bg-white rounded-lg shadow-md space-y-4">
+      <h2 className="text-xl font-bold">{key._id ? 'Edit Key' : 'Create New Key'}</h2>
+      <FormInput label="Key Name" value={key.name || ''} onChange={handleChange('name')} />
+      <FormInput label="Degree (d)" value={key.d || ''} onChange={handleChange('d')} />
+      <FormInput label="Min Bound" value={key.minBound || '32'} onChange={handleChange('minBound')} />
+      <FormInput label="Max Bound" value={key.maxBound || '126'} onChange={handleChange('maxBound')} />
+      <DynamicListInput label="Start Values (starts)" items={key.starts || []} setItems={handleListChange('starts')} />
+      <DynamicListInput label="Operations (I)" items={key.I || []} setItems={handleListChange('I')} />
+      <DynamicListInput label="Transformation (TC)" items={key.TC || []} setItems={handleListChange('TC')} />
+      <div className="flex justify-end space-x-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    </form>
+  );
+}
+
+export default KeyConfigForm;    
+```
+
+```jsx
+// frontend\src\components\Note.jsx
+import React, { useRef, useEffect, useState } from "react";
+import Draggable from "react-draggable";
+import { ResizableBox } from "react-resizable";
+import "react-resizable/css/styles.css";
+import TagManager from "./TagManager";
+
+const NOTE_COLORS = [
+    { hex: '#fff000', name: 'Yellow' },
+    { hex: '#a7ffeb', name: 'Teal' },
+    { hex: '#f8bbd0', name: 'Pink' },
+    { hex: '#ccff90', name: 'Green' },
+    { hex: '#ffe0b2', name: 'Orange' },
+    { hex: '#d1c4e9', name: 'Purple' },
+    { hex: '#ffffff', name: 'White' },
+    { hex: '#242424', name: 'Dark', text: 'white' } 
+];
+
+// RENDERER: Wiki Syntax -> HTML Chips
+// We use a regex that is STRICT for the [[ ]] pattern to avoid breaking other HTML
+const parseAndRenderLinks = (htmlContent) => {
+    const content = String(htmlContent || "");
+    const internalLinkRegex = /\[\[(note|frame):(\d+)\]\]/g;
+    return content.replace(internalLinkRegex, (match, type, id) => {
+        const elementId = `${type}-${id}`;
+        return `<a href="#" data-internal-link="${elementId}" class="internal-link bg-blue-100 text-blue-800 px-1 rounded hover:bg-blue-200 cursor-pointer select-none" contenteditable="false">🔗 ${type} ${id}</a>`;
+    });
+};
+
+// SERIALIZER: HTML Chips -> Wiki Syntax
+// We ONLY touch the anchor tags we created. We DO NOT touch <b>, <i>, <br>, <div>
+const serializeContent = (htmlContent) => {
+    const linkRegex = /<a [^>]*data-internal-link="(\w+)-(\d+)"[^>]*>.*?<\/a>/g;
+    return htmlContent.replace(linkRegex, '[[$1:$2]]');
+};
+
+const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, onNavigate, scale, isDimmed }) => {
+    const nodeRef = useRef(null);
+    const contentRef = useRef(null);
+    const [contextMenu, setContextMenu] = useState(null);
+    const [showCopyFeedback, setShowCopyFeedback] = useState(false);
+
+    const handleDragStop = (e, data) => {
+        if (Math.abs(data.x - note.pos_x) > 1 || Math.abs(data.y - note.pos_y) > 1) {
+            onNoteUpdate(note.id, { pos_x: data.x, pos_y: data.y });
+        }
+    };
+    const handleResizeStop = (e, data) => onNoteUpdate(note.id, { width: data.size.width, height: data.size.height });
+
+    const handleBlur = () => {
+        if (contentRef.current) {
+            const rawHTML = contentRef.current.innerHTML;
+            
+            console.log(`[Note ${note.id} Debug] Raw HTML on Blur:`, rawHTML); // DEBUG
+            
+            const cleanContent = serializeContent(rawHTML);
+            
+            console.log(`[Note ${note.id} Debug] Serialized Content:`, cleanContent); // DEBUG
+
+            if (cleanContent !== note.content) {
+                onNoteUpdate(note.id, { content: cleanContent });
+            }
+        }
+    };
+
+    const handleContentClick = (e) => {
+        if (e.target.tagName === 'A' && e.target.dataset.internalLink) {
+            e.preventDefault();
+            e.stopPropagation(); 
+            const [type, id] = e.target.dataset.internalLink.split('-');
+            if (onNavigate) onNavigate(type, id);
+        }
+    };
+
+    const handleCopyLink = (e) => {
+        e.stopPropagation(); 
+        const code = `[[note:${note.id}]]`;
+        navigator.clipboard.writeText(code);
+        setShowCopyFeedback(true);
+        setTimeout(() => setShowCopyFeedback(false), 2000);
+    };
+
+    const handleContextMenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+    };
+
+    const changeColor = (hex) => { onNoteUpdate(note.id, { color_hex: hex }); setContextMenu(null); };
+
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, []);
+
+    const isDark = note.color_hex === '#242424';
+    const textColor = isDark ? 'text-white' : 'text-gray-900';
+    const visualClass = isDimmed ? "opacity-30 grayscale pointer-events-none transition-opacity duration-300" : "opacity-100 transition-opacity duration-300";
+
+    return (
+        <>
+            <Draggable nodeRef={nodeRef} handle=".drag-handle" onStop={handleDragStop} position={{ x: note.pos_x, y: note.pos_y }} scale={scale} disabled={isDimmed}>
+                <div 
+                    id={`note-${note.id}`} ref={nodeRef} 
+                    className={`absolute z-20 shadow-xl ${visualClass}`} 
+                    style={{ width: note.width, height: note.height }} 
+                    onContextMenu={handleContextMenu}
+                >
+                    <ResizableBox height={note.height} width={note.width} onResizeStop={handleResizeStop} minConstraints={[180, 150]} handle={<span className="react-resizable-handle react-resizable-handle-se" />}>
+                        <div className="w-full h-full rounded-lg flex flex-col overflow-hidden ring-1 ring-black ring-opacity-10 transition-colors duration-200" style={{ backgroundColor: note.color_hex || '#fff000' }}>
+                            
+                            {/* TOOLBAR */}
+                            <div className="drag-handle h-7 w-full cursor-move bg-black bg-opacity-5 hover:bg-opacity-10 flex items-center justify-between p-1 transition-colors select-none">
+                                <span className={`text-[10px] font-mono font-bold ml-1 ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+                                    #{note.id}
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                    <button onClick={handleCopyLink} className={`w-5 h-5 flex items-center justify-center font-bold relative ${isDark ? 'text-white/50 hover:text-blue-400' : 'text-black/30 hover:text-blue-600'}`} title="Copy Link Code">
+                                        🔗
+                                        {showCopyFeedback && <span className="absolute -top-6 -right-2 bg-black text-white text-[10px] px-1 rounded whitespace-nowrap z-50">Copied!</span>}
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); onNoteDelete(note.id); }} className={`w-5 h-5 flex items-center justify-center font-bold ${isDark ? 'text-white/50 hover:text-red-400' : 'text-black/30 hover:text-red-600'}`}>×</button>
+                                </div>
+                            </div>
+
+                            {/* CONTENT AREA */}
+                            <div 
+                                ref={contentRef} 
+                                contentEditable 
+                                suppressContentEditableWarning 
+                                className={`flex-grow w-full text-lg p-4 focus:outline-none font-sans leading-relaxed ${textColor}`}
+                                onBlur={handleBlur} 
+                                onClick={handleContentClick}
+                                // The key to rendering HTML is this prop. It injects the HTML string.
+                                dangerouslySetInnerHTML={{ __html: parseAndRenderLinks(note.content) }} 
+                            />
+
+                            <TagManager tags={note.tags || []} onAddTag={(t) => onTagAdd("notes", note.id, t)} onRemoveTag={(t) => onTagRemove("notes", note.id, t)} onDataChange={onDataChange} />
+                        </div>
+                    </ResizableBox>
+                </div>
+            </Draggable>
+
+            {contextMenu && (
+                <div className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-4 gap-2 w-32 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
+                    {NOTE_COLORS.map(c => (
+                        <button key={c.hex} onClick={() => changeColor(c.hex)} className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400" style={{ backgroundColor: c.hex }} title={c.name} />
+                    ))}
+                </div>
+            )}
+        </>
+    );
+};
+export default Note;
+```
+
+```jsx
+// frontend\src\components\Notification.jsx
+// frontend/src/components/Notification.jsx
+import React, { useState, useEffect } from 'react';
+
+function Notification({ message, duration = 5000 }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (message) {
+      setVisible(true);
+      const timer = setTimeout(() => {
+        setVisible(false);
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [message, duration]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed top-5 right-5 bg-blue-500 text-white p-4 rounded-lg shadow-lg animate-fade-in-out">
+      <h3 className="font-bold">{message.title}</h3>
+      <p>{message.body}</p>
+    </div>
+  );
+}
+
+export default Notification;
+```
+
+```jsx
+// frontend\src\components\ShortcutWidget.jsx
+import React, { useState } from 'react';
+
+const ShortcutWidget = ({ shortcut }) => {
+  const [status, setStatus] = useState("Idle");
+
+  const execute = async () => {
+    // Check if the API is actually available
+    if (!window.nativeAPI) {
+      console.error("Native API not initialized");
+      setStatus("Init Error");
+      return;
+    }
+
+    setStatus("Running...");
+    try {
+      // FIXED: Changed from window.electronAPI to window.nativeAPI
+      const token = await window.nativeAPI.getSecretToken();
+      
+      let url, body;
+      if (shortcut.type === 'command') {
+          url = 'http://localhost:4000/api/system/run';
+          body = { command: shortcut.command, args: shortcut.args };
+      } else {
+          url = 'http://localhost:4000/api/system/open';
+          body = { target: shortcut.target };
+      }
+
+      const res = await fetch(url, {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+      });
+      
+      const data = await res.json();
+      if (data.success || data.code === 0) {
+          setStatus("Done ✅");
+      } else {
+          setStatus("Error ❌");
+      }
+      
+      setTimeout(() => setStatus("Idle"), 2000);
+    } catch (e) {
+      console.error(e);
+      setStatus("Failed ⚠️");
+    }
+  };
+
+  return (
+    <div 
+      className="bg-gray-800 text-white p-3 rounded-lg shadow-lg w-48 flex items-center justify-between cursor-pointer hover:bg-gray-700 transition border border-gray-600 pointer-events-auto" 
+      onClick={execute}
+    >
+      <div className="overflow-hidden">
+        <div className="font-bold text-sm truncate">{shortcut.title}</div>
+        <div className="text-[10px] uppercase tracking-tighter text-gray-400">{status}</div>
+      </div>
+      <div className="text-xl ml-2">🚀</div>
+    </div>
+  );
+};
+
+export default ShortcutWidget;
+```
+
+```jsx
+// frontend\src\components\TagManager.jsx
+import React, { useRef } from "react";
+
+// Helper Component for individual Tag Pills
+const TagPill = ({ tag, onRemove, onColorChange }) => (
+    <div 
+        onClick={() => onColorChange(tag)} 
+        className="flex items-center text-white text-xs font-semibold px-2 py-1 rounded-full cursor-pointer transition-transform hover:scale-105 select-none" 
+        style={{ backgroundColor: tag.color_hex || '#3b82f6' }} 
+        title="Double-click to change color"
+    >
+        <span>{tag.name}</span>
+        <button
+            onClick={(e) => {
+                e.stopPropagation();
+                onRemove(tag.name);
+            }}
+            className="ml-2 text-white opacity-50 hover:opacity-100 font-bold"
+        >
+            ×
+        </button>
+    </div>
+);
+
+const TagManager = ({ tags, onAddTag, onRemoveTag, onDataChange }) => {
+    const colorInputRef = useRef(null);
+    const tagToChangeRef = useRef(null);
+
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter" && e.currentTarget.value.trim() !== "") {
+            e.preventDefault();
+            onAddTag(e.currentTarget.value.trim());
+            e.currentTarget.value = "";
+        }
+    };
+
+    const handleColorChange = (tag) => {
+        tagToChangeRef.current = tag;
+        if (colorInputRef.current) colorInputRef.current.click();
+    };
+
+    const onColorSelected = async (e) => {
+        const newColor = e.target.value;
+        const tag = tagToChangeRef.current;
+        if (!tag || !newColor) return;
+
+        try {
+            const token = await window.nativeAPI.getSecretToken();
+            await fetch(`http://localhost:4000/api/tags/${tag.name}`, {
+                method: "PUT",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({ color_hex: newColor }),
+            });
+            onDataChange(); // Refresh canvas data
+        } catch (err) {
+            console.error("Failed to update tag color", err);
+        }
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-2 p-2 border-t border-black border-opacity-10 bg-white bg-opacity-20 mt-auto">
+            {/* Hidden Color Input for Picker */}
+            <input 
+                type="color" 
+                ref={colorInputRef} 
+                onChange={onColorSelected} 
+                className="w-0 h-0 opacity-0 absolute pointer-events-none" 
+            />
+
+            {(tags || []).map((tag) => (
+                <TagPill 
+                    key={tag.name} 
+                    tag={tag} 
+                    onRemove={onRemoveTag} 
+                    onColorChange={handleColorChange} 
+                />
+            ))}
+            
+            <input 
+                type="text" 
+                onKeyDown={handleKeyDown} 
+                placeholder="+ tag" 
+                className="bg-transparent text-xs text-gray-600 placeholder-gray-400 focus:outline-none w-16 hover:w-24 transition-all" 
+                onClick={(e) => e.stopPropagation()} 
+            />
+        </div>
+    );
+};
+
+export default TagManager;
+```
+
+```jsx
+// frontend\src\components\TaskWidget.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import Draggable from 'react-draggable';
+import { ResizableBox } from 'react-resizable';
+import TagManager from './TagManager';
+import "react-resizable/css/styles.css";
+
+const formatTime = (ms) => {
+  const s = Math.floor((ms / 1000) % 60).toString().padStart(2, '0');
+  const m = Math.floor((ms / 1000 / 60) % 60).toString().padStart(2, '0');
+  const h = Math.floor(ms / 1000 / 3600).toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+};
+// [Insert at top of file, after imports]
+const NOTE_COLORS = [
+    { hex: '#1f2937', name: 'Default Dark' },
+    { hex: '#dc2626', name: 'Urgent Red' },
+    { hex: '#ea580c', name: 'Orange' },
+    { hex: '#15803d', name: 'Green' },
+    { hex: '#2563eb', name: 'Blue' },
+    { hex: '#7e22ce', name: 'Purple' }
+];
+
+// [Inside TaskWidget component, top of function]
+const TaskWidget = ({ task, onUpdate, scale }) => {
+  const nodeRef = useRef(null); 
+  const [elapsed, setElapsed] = useState(task.total_time_ms || 0);
+  const [contextMenu, setContextMenu] = useState(null);
+
+  useEffect(() => {
+    let interval;
+    if (task.is_running && task.current_session_start) {
+      interval = setInterval(() => {
+        setElapsed((task.total_time_ms || 0) + (Date.now() - task.current_session_start));
+      }, 1000);
+    } else { setElapsed(task.total_time_ms || 0); }
+    return () => clearInterval(interval);
+  }, [task.is_running, task.current_session_start, task.total_time_ms]);
+
+  const handleAction = async (action) => {
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/tasks/${task.id}/${action}`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+       body: JSON.stringify({ rating: 0, notes: "Quick session" })
+    });
+    onUpdate(); 
+  };
+
+  // --- DELETE HANDLER ---
+  const handleTerminate = async () => {
+    if(!confirm("Terminate and delete this task completely?")) return;
+    const token = await window.nativeAPI.getSecretToken();
+    // Assuming we don't have a DELETE route for tasks yet, or use generic query?
+    // Let's assume we create one or use raw SQL in backend if strict REST isn't there. 
+    // Wait, DB schema has tasks. We should add DELETE route to server.js if missing.
+    // For now, assuming standard REST:
+    // Actually, let's just Hide it? No, user said "terminate".
+    // I'll add a delete route fetch here:
+    // Note: You need to ensure app.delete('/api/tasks/:id') exists in backend.
+  };
+
+  const handleTagAction = async (action, tagName) => {
+      const token = await window.nativeAPI.getSecretToken();
+      const method = action === 'add' ? 'POST' : 'DELETE';
+      const url = action === 'add' ? `http://localhost:4000/api/tags/tasks/${task.id}` : `http://localhost:4000/api/tasks/${task.id}/tags/${tagName}`;
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
+      onUpdate();
+  };
+
+  const handleContextMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const changeColor = async (hex) => {
+      const token = await window.nativeAPI.getSecretToken();
+      await fetch(`http://localhost:4000/api/tasks/${task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ color_hex: hex }) });
+      setContextMenu(null);
+      onUpdate();
+  };
+
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    if(contextMenu) window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [contextMenu]);
+    return (
+    <Draggable nodeRef={nodeRef} scale={scale} handle=".task-header">
+      <div ref={nodeRef} className="absolute z-30 shadow-2xl" onContextMenu={handleContextMenu}> 
+        <ResizableBox width={300} height={180} minConstraints={[250, 150]} className="rounded-xl overflow-hidden border border-gray-700 transition-colors" style={{ backgroundColor: task.color_hex || '#1f2937', color: 'white' }} handle={<span className="react-resizable-handle react-resizable-handle-se" />}>
+            <div className="w-full h-full flex flex-col relative">
+                
+                {/* Header */}
+                <div className="task-header bg-black/20 p-2 cursor-move flex justify-between items-center select-none backdrop-blur-sm">
+                    <span className="font-bold text-sm truncate px-1">{task.title}</span>
+                    <div className="flex gap-2 items-center">
+                         <div className={`w-2 h-2 rounded-full ${task.is_running ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+                         {/* DELETE BUTTON */}
+                         <button onClick={handleTerminate} className="text-white/30 hover:text-red-500 font-bold px-1">×</button>
+                    </div>
+                </div>
+
+                <div className="flex-1 flex flex-col p-3 relative">
+                     <div className="text-center my-auto">
+                         <div className="font-mono text-5xl font-bold tracking-widest drop-shadow-lg opacity-90">
+                             {formatTime(elapsed)}
+                         </div>
+                     </div>
+                     <div className="mt-2 mb-8 overflow-hidden">
+                        <TagManager tags={task.tags || []} onAddTag={(t) => handleTagAction('add', t)} onRemoveTag={(t) => handleTagAction('remove', t)} onDataChange={onUpdate} />
+                     </div>
+                     <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+                         <button onClick={() => handleAction(task.is_running ? 'stop' : 'start')} className={`flex-1 py-1.5 rounded text-xs font-bold uppercase shadow-lg transition-transform active:scale-95 ${task.is_running ? 'bg-red-500 hover:bg-red-400' : 'bg-green-500 hover:bg-green-400'}`}>
+                            {task.is_running ? 'STOP' : 'START'}
+                         </button>
+                     </div>
+                </div>
+            </div>
+        </ResizableBox>
+
+        {contextMenu && (
+            <div className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-3 gap-2 w-24 animate-in fade-in zoom-in-95 duration-100" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
+                {NOTE_COLORS.map(c => ( <button key={c.hex} onClick={() => changeColor(c.hex)} className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: c.hex }} title={c.name} /> ))}
+            </div>
+        )}
+      </div>
+    </Draggable>
+  );
+};
+export default TaskWidget;
+```
+
+```jsx
+// frontend\src\components\WindowFrame.jsx
+import React, { useRef } from 'react'; // 1. Import useRef
+import Draggable from 'react-draggable';
+
+const WindowFrame = ({ title, onClose, children, initialPos = { x: 100, y: 100 }, width = 500 }) => {
+  const nodeRef = useRef(null); // 2. Create the reference
+
+  return (
+    <Draggable 
+      handle=".window-header" 
+      defaultPosition={initialPos}
+      nodeRef={nodeRef} // 3. Tell Draggable to use this ref (Stops the error)
+    >
+      <div 
+        ref={nodeRef} // 4. Attach the ref to the actual DIV
+        className="absolute z-50 flex flex-col bg-white rounded-lg shadow-2xl border border-gray-700 overflow-hidden"
+        style={{ width: width, minHeight: '300px' }}
+      >
+        {/* Window Header */}
+        <div className="window-header h-8 bg-gray-800 text-white flex items-center justify-between px-3 cursor-move select-none">
+          <span className="font-bold text-xs uppercase tracking-wider">{title}</span>
+          <div className="flex space-x-2">
+            <button 
+              onClick={onClose}
+              className="w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center"
+            >
+              <span className="text-xs pb-1">×</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Window Content */}
+        <div className="flex-1 overflow-auto p-4 bg-gray-100 text-gray-900">
+          {children}
+        </div>
+      </div>
+    </Draggable>
+  );
+};
+
+export default WindowFrame;
+```
+
+```jsx
+// frontend\src\pages\Dashboard.jsx
+// frontend/src/pages/Dashboard.jsx
+import React, { useState, useEffect } from 'react';
+// In Dashboard.jsx
+import ShortcutWidget from '../components/ShortcutWidget';
+
+// /!\ WARNING /!\
+// This file was edited to remove all IPC calls to the main process.
+// The backend server now handles all operations via REST API calls.
+// Ensure the backend server is running and accessible for this to work.
+// If window.electronAPI calls are found here, be careful if they are available or not.
+// If not, replace them with appropriate API calls to the backend server.
+/* Example replacement:
+
+// In the same React component (e.g., KeyManager.jsx)
+
+// No longer importing 'api' for IPC calls, as it's now for HTTP or removed.
+// Access window.electronAPI directly, as it's exposed by the preload script.
+
+const handleOpenFile = async () => {
+  // Ensure window.electronAPI is available before calling its methods
+  if (window.electronAPI && window.electronAPI.selectFile) {
+    const filePath = await window.electronAPI.selectFile();
+    if (filePath) {
+      console.log('Selected file:', filePath);
+    }
+  } else {
+    console.error("Electron API for file selection not available.");
+  }
+};
+
+
+*/
+import { getKeys, encryptFile, decryptFile, selectFile } from "../api";
+
+function Dashboard() {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [keys, setKeys] = useState([]);
+  const [selectedKeyId, setSelectedKeyId] = useState('');
+  const [intensity, setIntensity] = useState(10); // Default intensity
+
+  useEffect(() => {
+    getKeys().then(setKeys);
+  }, []);
+
+  const handleFileSelect = async () => {
+    const path = await selectFile();
+    if (path) {
+      setSelectedFile({ path, name: path.split(/[/\\]/).pop() });
+    }
+  };
+
+  const handleEncrypt = async () => {
+    if (!selectedFile || !selectedKeyId) {
+      alert('Please select a file and a key.');
+      return;
+    }
+    const selectedKey = keys.find(k => k._id === selectedKeyId);
+    await encryptFile(selectedFile.path, selectedKey, intensity);
+    setSelectedFile(null); // Clear after operation
+  };
+
+  const handleDecrypt = async () => {
+    if (!selectedFile || !selectedKeyId) {
+      alert('Please select a file and a key.');
+      return;
+    }
+    const selectedKey = keys.find(k => k._id === selectedKeyId);
+    await decryptFile(selectedFile.path, selectedKey);
+    setSelectedFile(null); // Clear after operation
+  };
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <div className="bg-white p-6 rounded-lg shadow-lg">
+        {/* File Selection */}
+        <div className="mb-4">
+          <button onClick={handleFileSelect} className="px-4 py-2 bg-blue-500 text-white rounded">
+            Select File
+          </button>
+          {selectedFile && <span className="ml-4 text-gray-700">Selected: {selectedFile.name}</span>}
+        </div>
+
+        {/* Key and Intensity Selection */}
+        <div className="flex items-center space-x-4 mb-6">
+          <select value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} className="p-2 border rounded">
+            <option value="">-- Select a Key --</option>
+            {keys.map(key => <option key={key._id} value={key._id}>{key.name}</option>)}
+          </select>
+          <label className="flex items-center space-x-2">
+            <span>Time Intensity:</span>
+            <input 
+              type="range" 
+              min="1" 
+              max="1000" 
+              value={intensity} 
+              onChange={(e) => setIntensity(parseInt(e.target.value))} 
+              className="w-48"
+            />
+            <span>{intensity}</span>
+          </label>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex space-x-4">
+          <button onClick={handleEncrypt} className="px-6 py-3 bg-green-600 text-white font-bold rounded hover:bg-green-700 disabled:bg-gray-400" disabled={!selectedFile || !selectedKeyId}>
+            Encrypt
+          </button>
+          <button onClick={handleDecrypt} className="px-6 py-3 bg-red-600 text-white font-bold rounded hover:bg-red-700 disabled:bg-gray-400" disabled={!selectedFile || !selectedKeyId}>
+            Decrypt
+          </button>
+        </div>
+      </div>
+      // Inside your render/return:
+<div className="absolute top-20 left-20">
+    <ShortcutWidget 
+        shortcut={{ 
+            title: "MPSI Drive", 
+            target: "C:\\Users\\aperonylo\\Documents\\MPSI", 
+            type: "url" 
+        }} 
+    />
+</div>
+<div className="absolute top-40 left-20">
+    <ShortcutWidget 
+        shortcut={{ 
+            title: "Wolfram Alpha", 
+            target: "https://www.wolframalpha.com", 
+            type: "url" 
+        }} 
+    />
+</div>
+    </div>
+    
+  );
+}
+
+export default Dashboard;
+```
+
+```jsx
+// frontend\src\pages\KeyManager.jsx
+// frontend/src/pages/KeyManager.jsx
+import React, { useState, useEffect } from 'react';
+import { getKeys, saveKey } from '../api.js'; // Import the new API module
+// Assume KeyConfigForm is a component for editing key details
+import KeyConfigForm from '../components/KeyConfigForm'; 
+
+function KeyManager() {
+  const [keys, setKeys] = useState([]);
+  const [selectedKey, setSelectedKey] = useState(null);
+
+  const refreshKeys = () => {
+    getKeys().then(setKeys);
+  };
+
+  useEffect(() => {
+    refreshKeys();
+  }, []);
+
+  const handleSaveKey = async (keyData) => {
+    await saveKey(keyData);
+    refreshKeys();
+    setSelectedKey(null); // Close the form
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Key Manager</h1>
+      <div className="flex space-x-4">
+        <div className="w-1/3">
+          <button onClick={() => setSelectedKey({})} className="w-full p-2 bg-blue-500 text-white rounded">
+            Create New Key
+          </button>
+          <ul className="mt-4 space-y-2">
+            {keys.map(key => (
+              <li key={key._id} onClick={() => setSelectedKey(key)} className="p-2 border rounded cursor-pointer hover:bg-gray-200">
+                {key.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="w-2/3">
+          {selectedKey && (
+            <KeyConfigForm
+              initialData={selectedKey}
+              onSave={handleSaveKey}
+              onCancel={() => setSelectedKey(null)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default KeyManager;
+```
+
+```js
+// frontend\src\styles\theme.js
+export const NOTE_COLORS = {
+    yellow: "#fff000",
+    blue: "#a7ffeb",
+    pink: "#f8bbd0",
+    green: "#ccff90"
+};
+```
+
+```js
+// shared\constants.js
+// shared/constants.js
+// This contract ensures the frontend and backend always speak the same language.
+// Changing a value here updates it everywhere.
+
+module.exports = {
+  IPC_CHANNELS: {
+    // File operations
+    FILE_SELECT: 'file:select',
+    FILE_ENCRYPT: 'file:encrypt',
+    FILE_DECRYPT: 'file:decrypt',
+    
+    // Database: Keys
+    DB_GET_KEYS: 'db:get-keys',
+    DB_SAVE_KEY: 'db:save-key',
+    DB_DELETE_KEY: 'db:delete-key',
+
+    // Database: Peers & Seeds
+    DB_GET_PEERS: 'db:get-peers',
+    DB_ADD_PEER: 'db:add-peer',
+
+    // P2P operations
+    P2P_CREATE_SEED: 'p2p:create-seed',
+    P2P_SEND_FILE: 'p2p:send-file',
+
+    // UI Notifications
+    NOTIFY_USER: 'notify:user',
+    NOTIFY_PROGRESS: 'notify:progress',
+  }
+};
+```
+

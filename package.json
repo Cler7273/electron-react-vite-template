@@ -1,44 +1,62 @@
 {
-  "name": "react-electron-vite-template",
-  "author": "Rahil Vahora",
-  "link": "github.com/rahil1202",
-  "version": "1.0.0",
-  "main": "electron/main.js",
-  "scripts": {
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\" \"wait-on http://localhost:5173 && electron .\"",
-    "backend": "npm run dev --prefix backend",
-    "frontend": "npm run dev --prefix frontend",
-    "build": "npm run build --prefix frontend",
-    "start": "concurrently \"npm run frontend\" \"wait-on http://localhost:5173 && electron .\""
-  },
-  "build": {
-    "appId": "com.example.project",
-    "directories": {
-      "output": "dist"
+    "name": "nasm-cryptor",
+    "version": "1.0.0",
+    "description": "Advanced cryptographic application using the NASMFAG principle.",
+    "main": "electron/main.js",
+    "scripts": {
+        "start": "concurrently  \"npm:dev:vite\" \"npm:dev:electron\"",
+        "dev:vite": "vite frontend",
+        "dev:electron": "wait-on tcp:5173 && electron .",
+        "build": "vite build frontend && electron-builder",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "rebuild": "npx @electron/rebuild --force --module-dir ."
     },
-    "files": [
-      "frontend/dist/**/*",
-      "electron/**/*",
-      "backend/dist/**/*",
-      "node_modules/**/*"
-    ],
-    "win": {
-      "target": "nsis"
+    "author": "Dan",
+    "license": "MIT",
+    "dependencies": {
+        "better-sqlite3": "^11.1.2",
+        "cors": "^2.8.5",
+        "express": "^4.21.2",
+        "nedb-promises": "^6.2.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-draggable": "^4.4.6",
+        "react-resizable": "^3.0.5"
     },
-    "mac": {
-      "target": "dmg"
+    "devDependencies": {
+        "@electron/rebuild": "^3.6.0",
+        "@vitejs/plugin-react": "^4.3.1",
+        "autoprefixer": "^10.4.19",
+        "concurrently": "^8.2.2",
+        "electron": "^31.2.1",
+        "electron-builder": "^25.1.8",
+        "postcss": "^8.4.39",
+        "tailwindcss": "^3.4.6",
+        "vite": "^5.3.4",
+        "wait-on": "^7.2.0"
     },
-    "linux": {
-      "target": "AppImage"
+    "build": {
+        "appId": "com.cognicanvas.app",
+        "productName": "CogniCanvas",
+        "files": [
+            "frontend/dist/",
+            "electron/",
+            "backend/",
+            "node_modules/",
+            "package.json"
+        ],
+        "directories": {
+            "buildResources": "assets",
+            "output": "release"
+        },
+        "win": {
+            "target": "nsis",
+            "publisherName": "YourName",
+            "verifyUpdateCodeSignature": false
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
     }
-  },
-  "keywords": [],
-  "license": "MIT",
-  "description": "Template for creating React Electron apps with Vite",
-  "devDependencies": {
-    "concurrently": "^9.1.2",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "wait-on": "^8.0.1"
-  }
 }
