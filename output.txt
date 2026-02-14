@@ -346,152 +346,40 @@ Understood. I have integrated the new crash report into the master list. Here is
 
 **Which specific problem should we tackle first?** 
 *(I recommend starting with **A1** and **A2** to stop the app from crashing, or **D1** to build the foundation for theme customization).*
-```
 
-```text
-// TODO
-# TODOs for NASM Crypto
 
-- [ ] error window not showing + error
-- [ ] last prompt to execute (subtle addition to add)
-```
 
-```py
-// tree.py
-#!/usr/bin/env python3
-import os
-import sys
 
-# -----------------------------------------------------------------------------
-# CONFIGURATION
-# -----------------------------------------------------------------------------
 
-# Folders to exclude from the tree to save performance/screen space
-DIR_BLACKLIST = {
-    '.git', 
-    '.github', 
-    '.vscode', 
-    '__pycache__', 
-    'node_modules', 
-    'win-unpacked', 
-    '.venv', 
-    'target', 
-    'build', 
-    'dist'
-}
+AFTER SOME IMPROVEMENTS, WE ARE NOW HERE
 
-# Files to exclude (optional, strictly exact match)
-FILE_BLACKLIST = {
-    
-}
+# CogniCanvas: Project Status & Handover
 
-# UTF-8 Box Drawing Characters
-PIPE = "│   "
-TEE  = "├── "
-LAST = "└── "
-SPACE= "    "
+## Critical Fixes Deployed
+1.  **HUD Restoration:** Task Widgets are now rendered in Screen Space (HUD), meaning they stay fixed on your screen while you zoom/pan the canvas.
+2.  **HTML Interpretation:** Notes now correctly display bold, italics, and custom links (`[[note:id]]`) without displaying raw HTML tags. The saving logic has been strictly scoped to avoid double-encoding.
+3.  **Task Calendar:** A detailed "Day View" has been added. Clicking a square on the heatmap reveals the exact tasks and durations for that day.
+4.  **Crash Fixes:** Removed the infinite loop in `TaskWidget` and the `useRef` crash.
 
-# -----------------------------------------------------------------------------
-# LOGIC
-# -----------------------------------------------------------------------------
+## Known Omissions & Technical Debt
+*   **Window Dragging:** The `App.jsx` uses a simplified window rendering logic. The Z-Index management (bringing a clicked window to front) is basic.
+*   **Task Deletion:** I implemented a "Hide" logic for task termination in the widget. A true `DELETE /api/tasks/:id` endpoint in `server.js` was added in the previous step but ensure it is robust (cascading deletes for time logs).
+*   **Performance:** `Canvas.jsx` re-renders frequently on zoom/pan. For large datasets (>100 notes), migrate the `view` state to a Ref-based loop (requestAnimationFrame) to decouple React renders from 60fps canvas updates.
 
-def print_tree(directory_path, prefix=""):
-    """
-    Recursively prints the file structure of the given directory.
-    """
-    # Verify path exists
-    if not os.path.exists(directory_path):
-        print(f"Error: Directory '{directory_path}' not found.")
-        return
+## Roadmap for Next Developer
+1.  **Mobile Companion App:** Build a simple React Native app that connects to the same IP (P2P logic from `p2p-service.js` is the foundation).
+2.  **Search Regex UI:** The backend supports Regex, but the Frontend search bar needs a "Toggle Regex" button to switch between plain text and regex modes.
+3.  **Encrypted Sync:** The `nasm-engine.js` is powerful. Use it to encrypt the entire SQLite DB file before syncing to cloud (Google Drive/Dropbox API).
 
-    # Get list of files and directories
-    try:
-        entries = os.listdir(directory_path)
-    except PermissionError:
-        print(f"{prefix}[Access Denied]")
-        return
-    except OSError as e:
-        print(f"{prefix}[Error: {e}]")
-        return
+## Debugging
+*   **Notes:** Check console for `[Note X Debug]` to see exactly what HTML is being saved vs rendered.
+*   **Tasks:** If tasks don't appear in HUD, verify `showTasks` prop in `Canvas.jsx` is true.
 
-    # Filter out blacklisted items
-    filtered_entries = [
-        e for e in entries 
-        if e not in DIR_BLACKLIST and e not in FILE_BLACKLIST
-    ]
-
-    # Sort: Directories first, then files (Case insensitive)
-    filtered_entries.sort(key=lambda x: (
-        not os.path.isdir(os.path.join(directory_path, x)), 
-        x.lower()
-    ))
-
-    total = len(filtered_entries)
-    
-    for i, entry in enumerate(filtered_entries):
-        # Determine if this is the last item in the current branch
-        is_last = (i == total - 1)
-        
-        path = os.path.join(directory_path, entry)
-        is_dir = os.path.isdir(path)
-        is_link = os.path.islink(path)
-        
-        # specific visual markers
-        marker = LAST if is_last else TEE
-        
-        # Format the name (add trailing slash for dirs, arrows for symlinks)
-        display_name = entry
-        if is_link:
-            try:
-                target = os.readlink(path)
-                display_name = f"{entry} -> {target}"
-            except OSError:
-                display_name = f"{entry} -> [unknown]"
-        elif is_dir:
-            display_name = f"{entry}/"
-
-        # Print the current item
-        print(f"{prefix}{marker}{display_name}")
-
-        # Recurse if it is a directory and NOT a symlink 
-        # (following symlinks can lead to infinite recursion)
-        if is_dir and not is_link:
-            # Prepare the prefix for the children
-            extension = SPACE if is_last else PIPE
-            print_tree(path, prefix + extension)
-
-# -----------------------------------------------------------------------------
-# ENTRY POINT
-# -----------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    # Use current working directory by default, or argument if provided
-    root_dir = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
-    
-    root_name = os.path.basename(os.path.abspath(root_dir))
-    if not root_name: root_name = root_dir # Handle root drive case
-
-    print(f"\033[1m{root_name}/\033[0m") # Bold root name
-    print_tree(root_dir)
-```
-
-```js
-// backend\add_test_node.js
-import Database from 'better-sqlite3';
-const db = new Database('cognicanvas.db');
-
-const stmt = db.prepare(
-    'INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)'
-);
-
-stmt.run('Hello, World!', 100, 150, 200, 200, '#FFFF88');
-
-console.log('Test note added to cognicanvas.db');
+THIS STATE IS COMPLEMENTARY AND DOESN'T OVERHAUL THE PREVIOUS UPGRADES TO BE DONE
 ```
 
 ```js
 // backend\server.js
-// backend/server.js
 const express = require('express');
 const cors = require('cors');
 const Database = require('better-sqlite3');
@@ -523,47 +411,93 @@ app.use((req, res, next) => {
   next();
 });
 
-
 const db = new Database("cognicanvas.db");
+// --- NEW: Register Regex Function ---
+db.function('regexp', (pattern, str) => {
+    try {
+        return new RegExp(pattern, 'i').test(str) ? 1 : 0;
+    } catch (e) { return 0; }
+});
 db.pragma("foreign_keys = ON");
 
-// 1. INITIAL SCHEMA
-db.exec(`
-  CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
-  CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
-  CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
-  CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
-  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-`);
+// --- ROBUST MIGRATION SYSTEM ---
+const MIGRATIONS = [
+    {
+        version: 1,
+        up: `
+            CREATE TABLE IF NOT EXISTS frames (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6');
+            CREATE TABLE IF NOT EXISTS note_tags (note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS frame_tags (frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, is_done BOOLEAN DEFAULT 0, created_at INTEGER, total_time_ms INTEGER DEFAULT 0, color_hex TEXT DEFAULT '#1f2937');
+            CREATE TABLE IF NOT EXISTS time_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER, start_time INTEGER, end_time INTEGER, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS task_tags (task_id INTEGER, tag_id INTEGER, PRIMARY KEY (task_id, tag_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS shortcuts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, target TEXT, type TEXT DEFAULT 'url', icon TEXT DEFAULT '🚀');
+            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+        `
+    },
+    {
+        version: 2,
+        up: `
+            ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;
+            ALTER TABLE time_logs ADD COLUMN session_notes TEXT;
+        `
+    },
+    {
+        version: 3,
+        up: `
+            ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';
+        `
+    }
+];
 
-// 2. FORCED MIGRATION (Fixes the "no such column: rating" error)
-const migrate = () => {
-    const columns = db.prepare("PRAGMA table_info(time_logs)").all();
-    const hasRating = columns.some(c => c.name === 'rating');
-    if (!hasRating) {
-        console.log("Migrating time_logs table...");
-        db.exec("ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;");
-        db.exec("ALTER TABLE time_logs ADD COLUMN session_notes TEXT;");
-    }
-    const taskCols = db.prepare("PRAGMA table_info(tasks)").all();
-    if (!taskCols.some(c => c.name === 'color_hex')) {
-        db.exec("ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';");
-    }
+const runMigrations = () => {
+    // 1. Initialize Version Table
+    db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER DEFAULT 0)`);
+    const result = db.prepare("SELECT version FROM schema_version").get();
+    let currentVersion = result ? result.version : 0;
+
+    if (!result) db.prepare("INSERT INTO schema_version (version) VALUES (0)").run();
+
+    console.log(`[DB] Current Schema Version: ${currentVersion}`);
+
+    // 2. Apply Missing Migrations
+    db.transaction(() => {
+        for (const migration of MIGRATIONS) {
+            if (migration.version > currentVersion) {
+                console.log(`[DB] Applying migration v${migration.version}...`);
+                try {
+                    // Check if columns exist before altering (defensive coding for dev envs)
+                    if (migration.version === 2) {
+                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
+                        if (!cols.some(c => c.name === 'rating')) db.exec(migration.up);
+                    } else if (migration.version === 3) {
+                        const cols = db.prepare("PRAGMA table_info(tasks)").all();
+                        if (!cols.some(c => c.name === 'color_hex')) db.exec(migration.up);
+                    } else {
+                        db.exec(migration.up);
+                    }
+                } catch (e) {
+                    // Ignore "duplicate column" errors if manual hotfixes were applied previously
+                    if (!e.message.includes('duplicate column')) throw e;
+                }
+                currentVersion = migration.version;
+            }
+        }
+        db.prepare("UPDATE schema_version SET version = ?").run(currentVersion);
+    })();
+    console.log(`[DB] Database is up to date (v${currentVersion}).`);
 };
-migrate();
 
+runMigrations();
 
+// --- HELPERS ---
 const getTagsFor = (table, id) => {
   return db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`).all(id);
 };
 
 // --- API ROUTES: CANVAS ---
-// 2. NEW ROUTES FOR SHORTCUTS
 app.get("/api/shortcuts", (req, res) => {
     try {
         const shortcuts = db.prepare("SELECT * FROM shortcuts").all();
@@ -585,7 +519,6 @@ app.delete("/api/shortcuts/:id", (req, res) => {
     res.json({ success: true });
 });
 
-// 3. NEW ROUTES FOR SETTINGS
 app.get("/api/settings", (req, res) => {
     const rows = db.prepare("SELECT * FROM settings").all();
     const settings = {};
@@ -598,21 +531,19 @@ app.post("/api/settings", (req, res) => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
     res.json({ success: true });
 });
-// --- UPDATE GET /api/all (Include Task Tags) ---
+
 app.get("/api/all", (req, res) => {
   const notes = db.prepare("SELECT * FROM notes").all().map(n => ({ ...n, tags: getTagsFor("note", n.id) }));
   const frames = db.prepare("SELECT * FROM frames").all().map(f => ({ ...f, tags: getTagsFor("frame", f.id) }));
   
-  // Update Task Fetching
   const tasks = db.prepare("SELECT * FROM tasks").all().map(task => {
     const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
-    // NEW: Get Tags for task
     const tags = getTagsFor("task", task.id); 
     return {
       ...task,
       is_running: !!activeLog,
       current_session_start: activeLog ? activeLog.start_time : null,
-      tags: tags // <--- Added
+      tags: tags 
     };
   });
 
@@ -624,28 +555,80 @@ app.post("/api/notes", (req, res) => {
   const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
   res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
 });
-
-app.put("/api/notes/:id", (req, res) => {
-  const { content, pos_x, pos_y, width, height, color_hex } = req.body;
-  db.prepare("UPDATE notes SET content = COALESCE(?, content), pos_x = COALESCE(?, pos_x), pos_y = COALESCE(?, pos_y), width = COALESCE(?, width), height = COALESCE(?, height), color_hex = COALESCE(?, color_hex) WHERE id = ?")
-    .run(content, pos_x, pos_y, width, height, color_hex, req.params.id);
-  res.json({ success: true });
+app.get("/api/search", (req, res) => {
+    try {
+        const query = req.query.q;
+        if (!query) return res.status(200).json({ noteIds: [], frameIds: [] });
+        
+        // Use REGEXP for power users, fallback to LIKE logic handled by the custom function if simple text
+        // The custom function handles the regex logic.
+        const noteIds = db
+            .prepare(`SELECT id FROM notes WHERE content REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        const frameIds = db
+            .prepare(`SELECT id FROM frames WHERE title REGEXP ?`)
+            .all(query)
+            .map((row) => row.id);
+            
+        res.status(200).json({ noteIds, frameIds });
+    } catch (error) {
+        // Fallback for invalid regex syntax to normal substring search
+        try {
+             const fallbackQuery = `%${query}%`;
+             const noteIds = db.prepare(`SELECT id FROM notes WHERE content LIKE ?`).all(fallbackQuery).map(r => r.id);
+             const frameIds = db.prepare(`SELECT id FROM frames WHERE title LIKE ?`).all(fallbackQuery).map(r => r.id);
+             res.status(200).json({ noteIds, frameIds });
+        } catch(e) {
+             res.status(500).json({ error: error.message });
+        }
+    }
 });
+// --- REPLACE THE EXISTING app.put("/api/notes/:id") WITH THIS ROBUST VERSION ---
+app.put("/api/notes/:id", (req, res) => {
+  try {
+      const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
+      
+      // Safety Check: Ensure note exists before trying to read it
+      const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
+      if (!existing) {
+          return res.status(404).json({ error: "Note not found (might have been deleted)" });
+      }
 
+      // If frame_id is explicitly undefined, keep existing. If null/number, use it.
+      // If we are moving (pos_x changed), we might be auto-updating frame_id.
+      // If frame_id is undefined in body, use existing.frame_id
+      const finalFrameId = frame_id === undefined ? existing.frame_id : frame_id;
+
+      const stmt = db.prepare(`
+        UPDATE notes SET 
+        content = COALESCE(?, content), 
+        pos_x = COALESCE(?, pos_x), 
+        pos_y = COALESCE(?, pos_y), 
+        width = COALESCE(?, width), 
+        height = COALESCE(?, height), 
+        color_hex = COALESCE(?, color_hex),
+        frame_id = ?
+        WHERE id = ?`);
+        
+      stmt.run(content, pos_x, pos_y, width, height, color_hex, finalFrameId, req.params.id);
+      res.json({ success: true });
+  } catch (error) {
+      console.error("Update Note Error:", error);
+      res.status(500).json({ error: error.message });
+  }
+});
 app.delete("/api/notes/:id", (req, res) => {
   db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
   res.json({ success: true });
 });
 
-// --- API ROUTES: TAGS (The fix for your 404) ---
-
-// --- UPDATE TAG ROUTE (Support Tasks) ---
-// Find your existing app.post("/api/tags/:itemType/:itemId"...) and replace it with:
+// --- TAGS ---
 app.post("/api/tags/:itemType/:itemId", (req, res) => {
   const { itemType, itemId } = req.params; 
   const { name } = req.body;
   
-  // Map URL param to DB table prefix
   let table;
   if (itemType === 'notes') table = 'note';
   else if (itemType === 'frames') table = 'frame';
@@ -676,39 +659,30 @@ app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
   }
   res.json({ message: "Tag removed" });
 });
-// Update tag color
+
 app.put("/api/tags/:name", (req, res) => {
   db.prepare("UPDATE tags SET color_hex = ? WHERE name = ?").run(req.body.color_hex, req.params.name);
   res.json({ success: true });
 });
 
-// --- FIXED KEY ROUTES ---
+// --- KEYS & CRYPTO ---
 app.get('/api/keys', async (req, res) => {
-  try {
-    const keys = await dbService.getKeys();
-    res.json(keys || []);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { res.json(await dbService.getKeys() || []); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/keys', async (req, res) => {
-  try {
-    // Ensure we handle both creation and updates
-    const result = await dbService.saveKey(req.body);
-    res.json({ success: true, result });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { res.json({ success: true, result: await dbService.saveKey(req.body) }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/keys/:id', async (req, res) => {
-  try {
-    await dbService.deleteKey(req.params.id);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  try { await dbService.deleteKey(req.params.id); res.json({ success: true }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- FIXED CRYPTO ROUTES ---
 app.post('/api/encrypt', async (req, res) => {
   const { filePath, keyConfig, intensity, savePath } = req.body;
-  // Passing empty functions as fallback progress/notify handlers
   const result = await fileService.encryptFile(filePath, keyConfig, intensity, savePath, () => {}, () => {});
   res.json(result);
 });
@@ -718,17 +692,24 @@ app.post('/api/decrypt', async (req, res) => {
   const result = await fileService.decryptFile(filePath, keyConfig, savePath, () => {}, () => {});
   res.json(result);
 });
-app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
-  dbService.init(USER_DATA_PATH); 
+// --- SYSTEM ---
+app.post('/api/system/open', async (req, res) => res.json(await systemService.openExternal(req.body.target)));
+app.post('/api/system/run', async (req, res) => res.json(await systemService.runCommand(req.body.command, req.body.args)));
+
+// --- FRAMES ---
+app.post("/api/frames", (req, res) => {
+    try {
+        const { title, pos_x, pos_y, width, height } = req.body;
+        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
+        const info = stmt.run(title, pos_x, pos_y, width, height);
+        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.put("/api/frames/:id", (req, res) => {
     try {
         const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
-        // Dynamic update similar to notes
         const updates = [];
         const params = [];
         if (title !== undefined) { updates.push("title = ?"); params.push(title); }
@@ -744,17 +725,30 @@ app.put("/api/frames/:id", (req, res) => {
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-// --- MPSI TASKS ROUTES (Fix for 404) ---
+
+app.delete("/api/frames/:id", (req, res) => {
+    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// --- TASKS ---
 app.post("/api/tasks", (req, res) => {
     try {
         const { title } = req.body;
-        // Default is_done to 0, total_time_ms to 0
         const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms) VALUES (?, 0, ?, 0)");
         const info = stmt.run(title, Date.now());
         res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
-
+app.put("/api/tasks/:id", (req, res) => {
+    try {
+        const { color_hex, title } = req.body;
+        // Allow updating color and title
+        db.prepare("UPDATE tasks SET color_hex = COALESCE(?, color_hex), title = COALESCE(?, title) WHERE id = ?")
+          .run(color_hex, title, req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.post("/api/tasks/:id/start", (req, res) => {
     try {
         const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(req.params.id, Date.now());
@@ -762,9 +756,8 @@ app.post("/api/tasks/:id/start", (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 4. UPDATED TASK ROUTES (Stop with Rating)
 app.post("/api/tasks/:id/stop", (req, res) => {
-    const { rating, notes } = req.body; // New optional params
+    const { rating, notes } = req.body; 
     const now = Date.now();
     const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
     
@@ -779,19 +772,24 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         res.status(400).json({ error: "No running timer" });
     }
 });
-app.delete("/api/frames/:id", (req, res) => {
-    db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+// --- ADD THIS NEW ROUTE FOR TASK HISTORY ---
+app.get("/api/history", (req, res) => {
+    try {
+        const logs = db.prepare(`
+            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, t.title as task_title, t.color_hex 
+            FROM time_logs l 
+            JOIN tasks t ON l.task_id = t.id 
+            WHERE l.end_time IS NOT NULL 
+            ORDER BY l.start_time DESC 
+            LIMIT 50
+        `).all();
+        res.json(logs);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ADD THIS ROUTE:
-app.post("/api/frames", (req, res) => {
-    try {
-        const { title, pos_x, pos_y, width, height } = req.body;
-        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
-        const info = stmt.run(title, pos_x, pos_y, width, height);
-        res.status(201).json({ id: info.lastInsertRowid, ...req.body });
-    } catch (error) { res.status(500).json({ error: error.message }); }
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
+  dbService.init(USER_DATA_PATH); 
 });
 ```
 
@@ -1197,192 +1195,6 @@ module.exports = new SystemService();
 ```
 
 ```js
-// backend\src\index.js
-// MODIFIED: Replaced ES Module imports with CommonJS requires
-const express = require("express");
-const cors = require("cors");
-const Database = require("better-sqlite3");
-
-const app = express();
-const PORT = 4000;
-app.use(cors());
-app.use(express.json());
-
-const db = new Database("cognicanvas.db");
-
-// This pragma command is critical for data integrity.
-db.pragma("foreign_keys = ON");
-
-// --- DATABASE SCHEMA ---
-// The schema remains the same, using ON DELETE CASCADE for robust deletions.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS frames ( id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT DEFAULT 'New Frame', pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, is_collapsed BOOLEAN DEFAULT 0 );
-  CREATE TABLE IF NOT EXISTS notes ( id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, pos_x INTEGER, pos_y INTEGER, width INTEGER, height INTEGER, color_hex TEXT, frame_id INTEGER, FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE );
-  CREATE TABLE IF NOT EXISTS tags ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color_hex TEXT DEFAULT '#3b82f6' );
-  CREATE TABLE IF NOT EXISTS note_tags ( note_id INTEGER, tag_id INTEGER, PRIMARY KEY (note_id, tag_id), FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE );
-  CREATE TABLE IF NOT EXISTS frame_tags ( frame_id INTEGER, tag_id INTEGER, PRIMARY KEY (frame_id, tag_id), FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE );
-`);
-
-// --- API Helper Function for Tags ---
-const getTagsFor = (table, id) => {
-    const stmt = db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`);
-    return stmt.all(id) || [];
-};
-
-// --- API ROUTES (No changes to logic) ---
-app.get("/api/all", (req, res) => {
-    try {
-        const notes = db
-            .prepare("SELECT * FROM notes")
-            .all()
-            .map((n) => ({ ...n, tags: getTagsFor("note", n.id) }));
-        const frames = db
-            .prepare("SELECT * FROM frames")
-            .all()
-            .map((f) => ({ ...f, tags: getTagsFor("frame", f.id) }));
-        const tags = db.prepare("SELECT * FROM tags ORDER BY name").all();
-        res.status(200).json({ notes, frames, tags });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get("/api/search", (req, res) => {
-    try {
-        const query = req.query.q;
-        if (!query) return res.status(200).json({ noteIds: [], frameIds: [] });
-        const searchQuery = `%${query}%`;
-        const noteIds = db
-            .prepare(`SELECT id FROM notes WHERE content LIKE ?`)
-            .all(searchQuery)
-            .map((row) => row.id);
-        const frameIds = db
-            .prepare(`SELECT id FROM frames WHERE title LIKE ?`)
-            .all(searchQuery)
-            .map((row) => row.id);
-        res.status(200).json({ noteIds, frameIds });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post("/api/notes", (req, res) => {
-    try {
-        const { content, pos_x, pos_y, width, height, color_hex } = req.body;
-        const stmt = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)");
-        const info = stmt.run(content, pos_x, pos_y, width, height, color_hex);
-        res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.put("/api/notes/:id", (req, res) => {
-    try {
-        const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
-        const stmt = db.prepare("UPDATE notes SET content = ?, pos_x = ?, pos_y = ?, width = ?, height = ?, color_hex = ?, frame_id = ? WHERE id = ?");
-        stmt.run(content, pos_x, pos_y, width, height, color_hex, frame_id ?? null, req.params.id);
-        res.status(200).json({ message: "Note updated" });
-    } catch (error) {
-        console.error("Error updating note:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-app.delete("/api/notes/:id", (req, res) => {
-    try {
-        db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
-        res.status(200).json({ message: "Note deleted" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.post("/api/frames", (req, res) => {
-    try {
-        const { title, pos_x, pos_y, width, height } = req.body;
-        const stmt = db.prepare("INSERT INTO frames (title, pos_x, pos_y, width, height, is_collapsed) VALUES (?, ?, ?, ?, ?, 0)");
-        const info = stmt.run(title, pos_x, pos_y, width, height);
-        res.status(201).json({ id: info.lastInsertRowid, ...req.body, is_collapsed: 0, tags: [] });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.put("/api/frames/:id", (req, res) => {
-    try {
-        const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
-        const stmt = db.prepare("UPDATE frames SET title = ?, pos_x = ?, pos_y = ?, width = ?, height = ?, is_collapsed = ? WHERE id = ?");
-        stmt.run(title, pos_x, pos_y, width, height, is_collapsed ? 1 : 0, req.params.id);
-        res.status(200).json({ message: "Frame updated" });
-    } catch (error) {
-        console.error("Error updating frame:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-app.delete("/api/frames/:id", (req, res) => {
-    try {
-        db.prepare("DELETE FROM frames WHERE id = ?").run(req.params.id);
-        res.status(200).json({ message: "Frame and its notes deleted" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-const addTagTo = db.transaction((table, itemId, tagName) => {
-    let tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(tagName);
-    if (!tag) {
-        const info = db.prepare("INSERT INTO tags (name) VALUES (?)").run(tagName);
-        tag = { id: info.lastInsertRowid };
-    }
-    db.prepare(`INSERT OR IGNORE INTO ${table}_tags (${table}_id, tag_id) VALUES (?, ?)`).run(itemId, tag.id);
-});
-app.put("/api/tags/:name", (req, res) => {
-    try {
-        const { name } = req.params;
-        const { color_hex } = req.body;
-        if (!color_hex) return res.status(400).json({ error: "color_hex is required." });
-        const info = db.prepare("UPDATE tags SET color_hex = ? WHERE name = ?").run(color_hex, name);
-        if (info.changes === 0) return res.status(404).json({ message: "Tag not found" });
-        res.status(200).json({ message: `Tag '${name}' color updated` });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.delete("/api/tags/:name", (req, res) => {
-    try {
-        const { name } = req.params;
-        const info = db.prepare("DELETE FROM tags WHERE name = ?").run(name);
-        if (info.changes === 0) return res.status(404).json({ message: "Tag not found" });
-        res.status(200).json({ message: `Tag '${name}' was deleted globally.` });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.post("/api/:itemType(notes|frames)/:itemId/tags", (req, res) => {
-    try {
-        const { itemType, itemId } = req.params;
-        const { name } = req.body;
-        if (!name) return res.status(400).json({ error: "Tag name is required." });
-        addTagTo(itemType.slice(0, -1), itemId, name.toLowerCase());
-        res.status(201).json({ message: "Tag added" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-app.delete("/api/:itemType(notes|frames)/:itemId/tags/:tagName", (req, res) => {
-    try {
-        const { itemType, itemId, tagName } = req.params;
-        const tag = db.prepare("SELECT id FROM tags WHERE name = ?").get(tagName);
-        if (tag) {
-            db.prepare(`DELETE FROM ${itemType.slice(0, -1)}_tags WHERE ${itemType.slice(0, -1)}_id = ? AND tag_id = ?`).run(itemId, tag.id);
-        }
-        res.status(200).json({ message: `Tag '${tagName}' removed` });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.listen(PORT, () => console.log(`Backend server MVP+ running on http://localhost:${PORT}`));
-```
-
-```js
 // electron\ipc-handlers.js
 // electron/ipc-handlers.js
 const { ipcMain, dialog } = require('electron');
@@ -1683,18 +1495,6 @@ export default {
 }
 ```
 
-```md
-// frontend\README.md
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-```
-
 ```js
 // frontend\tailwind.config.js
 /** @type {import('tailwindcss').Config} */
@@ -1812,18 +1612,21 @@ import CryptoApp from './apps/CryptoApp';
 import TasksApp from './apps/TasksApp';
 import ShortcutWidget from './components/ShortcutWidget';
 import SettingsApp from './apps/SettingsApp';
-
+import CommandPalette from './components/CommandPalette';
 
 function App() {
   const [openApps, setOpenApps] = useState([]);
   const [isReady, setIsReady] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Filters
   const [activeFilters, setActiveFilters] = useState([]); 
-  const [availableTags, setAvailableTags] = useState([]); // For Dropdown
+  const [availableTags, setAvailableTags] = useState([]); 
+  
+  // Settings & Theme
+  const [shortcuts, setShortcuts] = useState([]);
+  const [theme, setTheme] = useState({ canvas_bg: '#242424' });
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
-  // Update this function to fetch tags
+  // --- INITIALIZATION ---
   const fetchTags = async () => {
      try {
          const token = await window.nativeAPI.getSecretToken();
@@ -1835,40 +1638,11 @@ function App() {
      } catch(e) { console.error("Tag fetch error", e); }
   };
 
-  useEffect(() => {
-    initializeApi().then(() => {
-       setIsReady(true);
-       fetchTags(); // Initial fetch
-    });
-
-    // FIX TAG SYNC: Listen for updates from Canvas
-    window.addEventListener('cognicanvas:data-updated', fetchTags);
-    return () => window.removeEventListener('cognicanvas:data-updated', fetchTags);
-  }, []);
-
-  const toggleApp = (appName) => {
-    setOpenApps(prev => prev.includes(appName) ? prev.filter(a => a !== appName) : [...prev, appName]);
-  };
-
-  const toggleFilter = (tagName) => {
-    console.log("Toggling filter:", tagName);
-    setActiveFilters(prev => prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]);
-  };
-
-  const triggerAddFrame = () => {
-    console.log("App: Triggering Add Frame...");
-    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
-  };
-   const [shortcuts, setShortcuts] = useState([]); // NEW STATE
-  const [theme, setTheme] = useState({ canvas_bg: '#242424' }); // NEW STATE
-
   const refreshConfig = async () => {
       const token = await window.nativeAPI.getSecretToken();
-      
       // Load Shortcuts
       const sRes = await fetch('http://localhost:4000/api/shortcuts', { headers: { 'Authorization': `Bearer ${token}` } });
       setShortcuts(await sRes.json());
-
       // Load Settings
       const tRes = await fetch('http://localhost:4000/api/settings', { headers: { 'Authorization': `Bearer ${token}` } });
       const tData = await tRes.json();
@@ -1878,18 +1652,53 @@ function App() {
   useEffect(() => {
     initializeApi().then(() => {
        setIsReady(true);
-       refreshConfig(); // Load initial
+       fetchTags(); 
+       refreshConfig();
     });
 
-    // Listen for changes from Settings App
+    // Event Listeners
+    const handleToggleApp = (e) => toggleApp(e.detail);
+    window.addEventListener('cognicanvas:data-updated', fetchTags);
     window.addEventListener('cognicanvas:config-updated', refreshConfig);
-    return () => window.removeEventListener('cognicanvas:config-updated', refreshConfig);
+    window.addEventListener('cognicanvas:toggle-app', handleToggleApp);
+    
+    // Command Palette Shortcut
+    const handleKeyDown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            setIsPaletteOpen(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+        window.removeEventListener('cognicanvas:data-updated', fetchTags);
+        window.removeEventListener('cognicanvas:config-updated', refreshConfig);
+        window.removeEventListener('cognicanvas:toggle-app', handleToggleApp);
+        window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
+
+  const toggleApp = (appName) => {
+    setOpenApps(prev => prev.includes(appName) ? prev.filter(a => a !== appName) : [...prev, appName]);
+  };
+
+  const toggleFilter = (tagName) => {
+    setActiveFilters(prev => prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]);
+  };
+
+  const triggerAddFrame = () => {
+    window.dispatchEvent(new CustomEvent('cognicanvas:add-frame'));
+  };
+
   if (!isReady) return <div className="bg-[#1a1a1a] h-screen text-yellow-500 flex items-center justify-center font-mono">SYSTEM_BOOT...</div>;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#111] text-gray-100 font-sans select-none">
       
+      {/* COMMAND PALETTE */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} />
+
       {/* SIDEBAR DOCK */}
       <nav className="w-16 bg-black flex flex-col items-center py-4 space-y-4 z-[100] border-r border-white/10">
         <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black text-xl mb-4">C</div>
@@ -1901,18 +1710,12 @@ function App() {
 
       <div className="flex-1 flex flex-col relative">
         
-        {/* ENHANCED HEADER */}
+        {/* HEADER */}
         <header className="h-14 bg-[#f8f9fa] border-b border-gray-300 flex items-center px-4 space-x-4 z-40 shadow-sm text-gray-800">
-          
-          {/* Add Frame Button */}
-          <button 
-            onClick={triggerAddFrame}
-            className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md active:scale-95 transition-all whitespace-nowrap"
-          >
+          <button onClick={triggerAddFrame} className="bg-[#4285f4] text-white px-4 py-1.5 rounded-md text-sm font-bold hover:shadow-md active:scale-95 transition-all whitespace-nowrap">
             + Frame
           </button>
           
-          {/* Search Bar */}
           <div className="w-64 relative">
             <input 
               type="text" 
@@ -1921,15 +1724,14 @@ function App() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <div className="absolute right-2 top-2 text-xs text-gray-400">Ctrl+K</div>
           </div>
 
           <div className="h-8 w-px bg-gray-300 mx-2"></div>
 
-          {/* Tag Dropdown & List */}
+          {/* Tag Filter */}
           <div className="flex-1 flex items-center space-x-2 overflow-hidden">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tags:</span>
-            
-            {/* Dropdown */}
             <select 
                 className="bg-white border border-gray-300 text-gray-700 text-xs rounded p-1 outline-none focus:border-blue-500"
                 onChange={(e) => { if(e.target.value) { toggleFilter(e.target.value); e.target.value = ""; } }}
@@ -1939,32 +1741,20 @@ function App() {
                     <option key={tag} value={tag}>{tag}</option>
                 ))}
             </select>
-
-            {/* Selected Tags List */}
             <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
-                {activeFilters.length === 0 && <span className="text-xs text-gray-400 italic">No filters active</span>}
-                
                 {activeFilters.map(tag => (
-                <div 
-                    key={tag}
-                    className="px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-xs font-bold flex items-center whitespace-nowrap"
-                >
+                <div key={tag} className="px-2 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-xs font-bold flex items-center whitespace-nowrap">
                     {tag} <button className="ml-1 text-blue-400 hover:text-blue-900" onClick={() => toggleFilter(tag)}>×</button>
                 </div>
                 ))}
             </div>
-
-            {/* Clear All */}
             {activeFilters.length > 0 && (
-                <button onClick={() => setActiveFilters([])} className="text-xs text-red-500 hover:text-red-700 underline font-bold whitespace-nowrap">
-                    Clear
-                </button>
+                <button onClick={() => setActiveFilters([])} className="text-xs text-red-500 hover:text-red-700 underline font-bold whitespace-nowrap">Clear</button>
             )}
           </div>
         </header>
 
        <div className="flex-1 relative z-10">
-          {/* PASS THEME COLOR TO CANVAS */}
           <Canvas 
             searchQuery={searchQuery} 
             activeFilters={activeFilters} 
@@ -1972,20 +1762,38 @@ function App() {
             bgColor={theme.canvas_bg} 
           />
           
-          {/* DYNAMIC SHORTCUTS LAYER */}
+          {/* DESKTOP SHORTCUTS */}
           <div className="absolute top-4 left-4 z-20 flex flex-col space-y-2 pointer-events-none">
             {shortcuts.map(s => (
                 <ShortcutWidget key={s.id} shortcut={s} />
             ))}
           </div>
 
-          {/* WINDOWS */}
+          {/* APP WINDOWS LAYER */}
           <div className="absolute inset-0 z-50 pointer-events-none">
-            {/* ... other apps ... */}
             
+            {/* TASKS APP WINDOW */}
+            {openApps.includes('tasks') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="Task Manager" onClose={() => toggleApp('tasks')} width={450} initialPos={{x: 100, y: 100}}>
+                  <TasksApp />
+                </WindowFrame>
+              </div>
+            )}
+
+            {/* CRYPTO APP WINDOW */}
+            {openApps.includes('crypto') && (
+              <div className="pointer-events-auto">
+                <WindowFrame title="NASM Cryptor 2.0" onClose={() => toggleApp('crypto')} width={600} initialPos={{x: 150, y: 150}}>
+                  <CryptoApp />
+                </WindowFrame>
+              </div>
+            )}
+            
+            {/* SETTINGS APP WINDOW */}
             {openApps.includes('settings') && (
               <div className="pointer-events-auto">
-                <WindowFrame title="System Settings" onClose={() => toggleApp('settings')} width={600} initialPos={{x: 200, y: 100}}>
+                <WindowFrame title="System Settings" onClose={() => toggleApp('settings')} width={600} initialPos={{x: 200, y: 200}}>
                   <SettingsApp />
                 </WindowFrame>
               </div>
@@ -2463,23 +2271,68 @@ export default SettingsApp;
 
 ```jsx
 // frontend\src\apps\TasksApp.jsx
+// frontend/src/apps/TasksApp.jsx
 import React, { useState, useEffect } from 'react';
 
 const TasksApp = () => {
+  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
   const [tasks, setTasks] = useState([]);
+  const [history, setHistory] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
 
+  // --- HELPERS ---
+  const formatDurationHMS = (ms) => {
+      if (!ms) return "0s";
+      const seconds = Math.floor((ms / 1000) % 60);
+      const minutes = Math.floor((ms / (1000 * 60)) % 60);
+      const hours = Math.floor((ms / (1000 * 60 * 60)));
+
+      const parts = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+      
+      return parts.join(' ');
+  };
+
+  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  // --- API FETCHING ---
   const fetchTasks = async () => {
     try {
       const token = await window.nativeAPI.getSecretToken();
       const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       setTasks(data.tasks || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch tasks failed", e); }
   };
 
-  useEffect(() => { fetchTasks(); }, []);
+  const fetchHistory = async () => {
+      try {
+        const token = await window.nativeAPI.getSecretToken();
+        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        setHistory(data || []);
+      } catch (e) { console.error("Fetch history failed", e); }
+  };
 
+  // --- LIFECYCLE ---
+  useEffect(() => {
+    // Initial Load
+    fetchTasks();
+    fetchHistory();
+
+    // Listen for widget updates (start/stop on canvas) to refresh this list
+    const handleRefresh = () => {
+        fetchTasks();
+        if (tab !== 'active') fetchHistory();
+    };
+    window.addEventListener('cognicanvas:data-updated', handleRefresh);
+    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
+  }, [tab]);
+
+  // --- HANDLERS ---
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
@@ -2492,46 +2345,339 @@ const TasksApp = () => {
     });
     setNewTaskTitle("");
     fetchTasks();
-    // Refresh Canvas widgets too
+    // Notify Canvas to spawn widget
     window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
   };
 
-  return (
-    <div className="p-4 space-y-4">
-      <form onSubmit={handleCreate} className="flex gap-2">
-        <input 
-          type="text" 
-          className="flex-1 border rounded px-2 py-1 text-sm text-black"
-          placeholder="New Task Name..." 
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          autoFocus
-        />
-        <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold">Add</button>
-      </form>
+  // --- RENDERERS ---
+  const renderActive = () => (
+    <>
+        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
+            <input 
+                type="text" 
+                className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                placeholder="New Task Name..." 
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                autoFocus
+            />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">
+                Add
+            </button>
+        </form>
 
-      <div className="space-y-2">
-        {tasks.length === 0 && <p className="text-gray-500 text-sm italic text-center">No tasks yet.</p>}
-        {tasks.map(task => (
-          <div key={task.id} className="bg-white border rounded p-2 flex justify-between items-center shadow-sm">
-            <div>
-              <div className="font-bold text-gray-800 text-sm">{task.title}</div>
-              <div className="text-xs text-gray-500">
-                Total: {Math.floor(task.total_time_ms / 1000 / 60)}m 
-                {task.is_running && <span className="text-green-600 font-bold ml-1">(RUNNING)</span>}
+        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            {tasks.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No active tasks.</p>}
+            {tasks.map(task => (
+                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
+                    <div>
+                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">
+                            {task.title}
+                            {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono mt-1">
+                            Total: {formatDurationHMS(task.total_time_ms)}
+                        </div>
+                    </div>
+                    {task.is_running && <span className="text-[10px] font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900">RUNNING</span>}
+                </div>
+            ))}
+        </div>
+    </>
+  );
+
+  const renderHistory = () => (
+      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+          {history.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No session history found.</p>}
+          {history.map(log => (
+              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
+                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                      <div className="text-xs text-gray-400 font-mono">
+                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
+                      </div>
+                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
+                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
+                      </div>
+                  </div>
               </div>
-            </div>
-            <div className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500">
-              Widget Active
-            </div>
+          ))}
+      </div>
+  );
+
+  const renderCalendar = () => {
+      // Logic: Generate last 28 days
+      const days = [];
+      const today = new Date();
+      // Reset to start of day for accurate comparison
+      today.setHours(0,0,0,0);
+
+      for(let i=27; i>=0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toLocaleDateString();
+          
+          // Aggregate Logs
+          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
+          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
+          
+          let colorClass = 'bg-gray-800 border-gray-700';
+          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
+          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
+          if(totalMs > 14400000) colorClass = 'bg-green-500 border-green-400'; // > 4h
+
+          days.push(
+              <div key={i} className={`h-8 w-8 rounded ${colorClass} border flex items-center justify-center text-[10px] relative group cursor-help transition-all hover:scale-110`}>
+                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
+                  
+                  {/* Tooltip */}
+                  {totalMs > 0 && (
+                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap hidden group-hover:block z-50 border border-gray-600 shadow-xl">
+                          {formatDurationHMS(totalMs)}
+                      </div>
+                  )}
+              </div>
+          );
+      }
+
+      return (
+          <div className="p-2">
+              <div className="flex justify-between items-baseline mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
+                  <span className="text-[10px] text-gray-500">Last 28 Days</span>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                  {days}
+              </div>
+              <div className="mt-4 flex gap-2 justify-center text-[10px] text-gray-500">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-gray-800 rounded"></div> 0m</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-900/60 rounded"></div> &lt;1h</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-700 rounded"></div> &gt;1h</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded"></div> &gt;4h</span>
+              </div>
           </div>
-        ))}
+      );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
+      {/* Custom Tab Bar */}
+      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
+          {['active', 'history', 'calendar'].map(t => (
+            <button 
+                key={t}
+                onClick={() => setTab(t)} 
+                className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all
+                    ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
+                `}
+            >
+                {t}
+            </button>
+          ))}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0">
+        {tab === 'active' && renderActive()}
+        {tab === 'history' && renderHistory()}
+        {tab === 'calendar' && renderCalendar()}
       </div>
     </div>
   );
 };
 
 export default TasksApp;
+
+/**COMPLEMENTARY CODE FOR FUTUR UNIFICATION. BUT IT WAS SOMEWHY INCOMPLETE SO ADDED HERE TO NOT LOOSE ANYTHING
+ * 
+ * import React, { useState, useEffect } from 'react';
+
+const TasksApp = () => {
+  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
+  const [tasks, setTasks] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  // NEW: State for selected day details
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const formatDurationHMS = (ms) => {
+      if (!ms) return "0s";
+      const seconds = Math.floor((ms / 1000) % 60);
+      const minutes = Math.floor((ms / (1000 * 60)) % 60);
+      const hours = Math.floor((ms / (1000 * 60 * 60)));
+      const parts = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+      return parts.join(' ');
+  };
+
+  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  const fetchTasks = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch (e) { console.error("Fetch tasks failed", e); }
+  };
+
+  const fetchHistory = async () => {
+      try {
+        const token = await window.nativeAPI.getSecretToken();
+        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        setHistory(data || []);
+      } catch (e) { console.error("Fetch history failed", e); }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+    fetchHistory();
+    const handleRefresh = () => { fetchTasks(); if (tab !== 'active') fetchHistory(); };
+    window.addEventListener('cognicanvas:data-updated', handleRefresh);
+    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
+  }, [tab]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ title: newTaskTitle }) });
+    setNewTaskTitle("");
+    fetchTasks();
+    window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+  };
+
+  // --- RENDERERS ---
+  const renderActive = () => (
+    <>
+        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
+            <input type="text" className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="New Task Name..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} autoFocus />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">Add</button>
+        </form>
+        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            {tasks.map(task => (
+                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
+                    <div>
+                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">{task.title} {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}</div>
+                        <div className="text-xs text-gray-400 font-mono mt-1">Total: {formatDurationHMS(task.total_time_ms)}</div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </>
+  );
+
+  const renderHistoryList = (list) => (
+      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+          {list.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No records found.</p>}
+          {list.map(log => (
+              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
+                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                      <div className="text-xs text-gray-400 font-mono">
+                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
+                      </div>
+                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
+                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
+                      </div>
+                  </div>
+              </div>
+          ))}
+      </div>
+  );
+
+  const renderCalendar = () => {
+      // Logic: Generate last 28 days
+      const days = [];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      for(let i=27; i>=0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toLocaleDateString();
+          
+          // Find logs for this specific day
+          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
+          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
+          
+          let colorClass = 'bg-gray-800 border-gray-700';
+          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
+          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
+          
+          const isSelected = selectedDate === dateStr;
+
+          days.push(
+              <div 
+                key={i} 
+                className={`h-8 w-8 rounded border flex items-center justify-center text-[10px] relative cursor-pointer transition-all hover:scale-110 
+                    ${colorClass} ${isSelected ? 'ring-2 ring-white scale-110 z-10' : ''}`}
+                onClick={() => setSelectedDate(dateStr)}
+              >
+                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
+              </div>
+          );
+      }
+
+      // Filter history for selected date
+      const selectedLogs = selectedDate 
+        ? history.filter(h => new Date(h.start_time).toLocaleDateString() === selectedDate)
+        : [];
+
+      return (
+          <div className="p-2 h-full flex flex-col">
+              <div className="flex justify-between items-baseline mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
+                  <span className="text-[10px] text-gray-500">Click a day to view details</span>
+              </div>
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                  {days}
+              </div>
+              
+              // Day Details View 
+              <div className="flex-1 min-h-0 border-t border-gray-700 pt-2">
+                  <h4 className="text-xs font-bold text-white mb-2">
+                      {selectedDate ? `Activity for ${selectedDate}` : "Select a day above"}
+                  </h4>
+                  {selectedDate && renderHistoryList(selectedLogs)}
+              </div>
+          </div>
+      );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
+      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
+          {['active', 'history', 'calendar'].map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+                {t}
+            </button>
+          ))}
+      </div>
+      <div className="flex-1 min-h-0">
+        {tab === 'active' && renderActive()}
+        {tab === 'history' && renderHistoryList(history)}
+        {tab === 'calendar' && renderCalendar()}
+      </div>
+    </div>
+  );
+};
+
+export default TasksApp;
+ * 
+ * 
+ * 
+ */
 ```
 
 ```jsx
@@ -2541,16 +2687,17 @@ import Note from './Note';
 import Frame from './Frame';
 import TaskWidget from './TaskWidget';
 
+
 const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424' }) => {
   const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
   const viewRef = useRef({ x: 0, y: 0, scale: 1 });
-  const [forceRender, setForceRender] = useState(0); 
   const [isPanning, setIsPanning] = useState(false);
   const containerRef = useRef(null);
+  const [, forceUpdate] = useState(0); // Trigger re-render for refs
 
   const setView = (newView) => {
       viewRef.current = { ...viewRef.current, ...newView };
-      setForceRender(prev => prev + 1);
+      forceUpdate(n => n + 1);
   };
 
   const fetchData = async () => {
@@ -2563,28 +2710,65 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
     } catch (e) { console.error(e); }
   };
 
+  useEffect(() => { fetchData(); }, []);
+
+  // --- LOGIC: Filter Matching ---
+  const getFilterMatch = (item) => {
+      // Generic filter that works for Notes AND Tasks
+      const contentStr = (item.content || item.title || "").toLowerCase();
+      const normSearch = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || contentStr.includes(normSearch);
+      
+      const matchesTags = activeFilters.length === 0 || 
+        (item.tags && item.tags.some(tag => activeFilters.includes(tag.name)));
+
+      return matchesSearch && matchesTags;
+  };
+
+  
+
+  const tasksToRender = data.tasks.map(task => {
+      const isMatch = getFilterMatch(task);
+      // Don't show filtered-out tasks at all, or show them dimmed? 
+      // Users usually want to find tasks, so hiding non-matches is better.
+      if (!isMatch && (searchQuery || activeFilters.length > 0)) return null;
+
+      return (
+         <TaskWidget 
+            key={task.id} 
+            task={task} 
+            scale={viewRef.current.scale} 
+            onUpdate={fetchData} 
+            onDelete={async (id) => {
+                // We actually don't want to delete tasks easily from widget, 
+                // but if needed we can add logic here. 
+                // For now, we rely on the widget's internal 'terminate' logic if we add it.
+            }}
+         />
+      );
+  }).filter(Boolean);
+
+  
+
   useEffect(() => { 
     fetchData(); 
     const container = containerRef.current;
     if (!container) return;
 
-    // --- FIX: ZOOM ANCHOR (Mouse Centered) ---
+    // Native Wheel Handler for smooth zoom
     const handleWheelNative = (e) => {
       e.preventDefault();
       const current = viewRef.current;
       const rect = container.getBoundingClientRect();
-      
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // World coordinates under mouse
       const worldX = (mouseX - current.x) / current.scale;
       const worldY = (mouseY - current.y) / current.scale;
 
       const delta = -e.deltaY * 0.001;
       const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
 
-      // New offsets to keep world point under mouse
       const newX = mouseX - (worldX * newScale);
       const newY = mouseY - (worldY * newScale);
 
@@ -2595,15 +2779,36 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
     return () => container.removeEventListener('wheel', handleWheelNative);
   }, []);
 
-  // --- FIX: DOUBLE CLICK (Infinite Click Area) ---
-  const handleDoubleClick = async (e) => {
-    // Only trigger if we clicked the actual background (container)
-    // or the empty transform layer
-    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
+  // --- CAMERA TELEPORT ---
+  const focusOnItem = (type, id) => {
+      let target = null;
+      const itemId = parseInt(id);
 
+      if (type === 'note') target = data.notes.find(n => n.id === itemId);
+      else if (type === 'frame') target = data.frames.find(f => f.id === itemId);
+
+      if (target) {
+          const targetCenterX = target.pos_x + (target.width / 2);
+          const targetCenterY = target.pos_y + (target.height / 2);
+
+          const canvasWidth = containerRef.current?.clientWidth || window.innerWidth;
+          const canvasHeight = containerRef.current?.clientHeight || window.innerHeight;
+
+          const newScale = 1;
+          const newX = (canvasWidth / 2) - (targetCenterX * newScale);
+          const newY = (canvasHeight / 2) - (targetCenterY * newScale);
+
+          setView({ x: newX, y: newY, scale: newScale });
+      }
+  };
+
+  // --- ACTIONS ---
+  const handleDoubleClick = async (e) => {
+    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) - viewRef.current.x) / viewRef.current.scale;
-    const y = ((e.clientY - rect.top) - viewRef.current.y) / viewRef.current.scale;
+    const current = viewRef.current;
+    const x = ((e.clientX - rect.left) - current.x) / current.scale;
+    const y = ((e.clientY - rect.top) - current.y) / current.scale;
 
     const token = await window.nativeAPI.getSecretToken();
     await fetch('http://localhost:4000/api/notes', {
@@ -2612,6 +2817,282 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
       body: JSON.stringify({ content: "New Note", pos_x: x - 100, pos_y: y - 100, width: 200, height: 200, color_hex: "#fff000" })
     });
     fetchData();
+  };
+
+  const handleNoteUpdateDrag = async (id, changes) => {
+    let updates = { ...changes };
+    // Check for frame capture if moving
+    if (changes.pos_x !== undefined) {
+        const note = data.notes.find(n => n.id === id);
+        const cx = changes.pos_x + (note.width / 2);
+        const cy = changes.pos_y + (note.height / 2);
+        const parentFrame = data.frames.find(f => !f.is_collapsed && cx >= f.pos_x && cx <= (f.pos_x + f.width) && cy >= f.pos_y && cy <= (f.pos_y + f.height));
+        updates.frame_id = parentFrame ? parentFrame.id : null;
+    }
+    // Optimistic Update
+    setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/notes/${id}`, { 
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+        body: JSON.stringify(updates) 
+    });
+  };
+
+  const handleFrameDrag = (frameId, dx, dy) => {
+    // Synchronous movement of frame + children
+    setData(prev => ({
+      ...prev,
+      frames: prev.frames.map(f => f.id === frameId ? { ...f, pos_x: f.pos_x + dx, pos_y: f.pos_y + dy } : f),
+      notes: prev.notes.map(n => n.frame_id === frameId ? { ...n, pos_x: n.pos_x + dx, pos_y: n.pos_y + dy } : n)
+    }));
+  };
+
+  const handleFrameStop = async (id, finalPos) => {
+    const token = await window.nativeAPI.getSecretToken();
+    // 1. Save Frame
+    await fetch(`http://localhost:4000/api/frames/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(finalPos)
+    });
+    // 2. Save Children
+    const children = data.notes.filter(n => n.frame_id === id);
+    for (const child of children) {
+        await fetch(`http://localhost:4000/api/notes/${child.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ pos_x: child.pos_x, pos_y: child.pos_y })
+        });
+    }
+  };
+
+  const handleUpdateFrame = async (id, changes) => {
+    setData(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f) }));
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch(`http://localhost:4000/api/frames/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(changes)
+    });
+  };
+
+  const handleTagAction = async (action, type, id, tagName) => {
+    const token = await window.nativeAPI.getSecretToken();
+    const url = action === 'add' ? `http://localhost:4000/api/tags/${type}/${id}` : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
+    await fetch(url, { method: action === 'add' ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
+    fetchData();
+  };
+
+  // Re-declare for brevity in this snippet
+  const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+      setView({ scale: newScale }); // Simple zoom for brevity
+  };
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container?.removeEventListener('wheel', handleWheelNative);
+  }, []);
+
+  useEffect(() => {
+    const onAddFrame = async () => {
+        const token = await window.nativeAPI.getSecretToken();
+        const current = viewRef.current;
+        const newFrame = { 
+            title: "NEW FRAME", 
+            pos_x: (-current.x + 100) / current.scale, 
+            pos_y: (-current.y + 100) / current.scale, 
+            width: 400, 
+            height: 300 
+        };
+        await fetch('http://localhost:4000/api/frames', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newFrame) });
+        fetchData();
+    };
+    window.addEventListener('cognicanvas:add-frame', onAddFrame);
+    return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
+  }, []);
+  const notesToRender = data.notes.map(note => {
+      if (note.frame_id) {
+          const parent = data.frames.find(f => f.id === note.frame_id);
+          if (parent && parent.is_collapsed) return null;
+      }
+      
+      const isMatch = getFilterMatch(note);
+      const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
+
+      return (
+          <Note 
+            key={note.id} note={note} scale={viewRef.current.scale} isDimmed={isDimmed} 
+            onNoteUpdate={handleNoteUpdateDrag}
+            onNoteDelete={async (id) => {
+                await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                fetchData();
+            }}
+            onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
+            onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
+            onDataChange={fetchData}
+            onNavigate={focusOnItem} 
+          />
+      );
+  }).filter(Boolean);
+   return (
+    <div 
+        ref={containerRef}
+        onDoubleClick={handleDoubleClick}
+        onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) setIsPanning(true); }}
+        onMouseMove={(e) => { if(isPanning) setView({ x: viewRef.current.x + e.movementX, y: viewRef.current.y + e.movementY }); }}
+        onMouseUp={() => setIsPanning(false)}
+        className="w-full h-full overflow-hidden relative cursor-default"
+        style={{ backgroundColor: bgColor }}
+    >
+      <div 
+        id="transform-layer"
+        style={{ 
+            transform: `translate(${viewRef.current.x}px, ${viewRef.current.y}px) scale(${viewRef.current.scale})`, 
+            transformOrigin: '0 0',
+            position: 'absolute',
+            width: '100%', height: '100%',
+            pointerEvents: 'none' 
+        }}
+      >
+          {/* GRID */}
+          <div className="absolute opacity-10 top-[-200000px] left-[-200000px] w-[400000px] h-[400000px] pointer-events-none"
+             style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
+          />
+
+          <div className="pointer-events-auto">
+            {data.frames.map(frame => (
+                <Frame 
+                    key={frame.id} frame={frame} scale={viewRef.current.scale} 
+                    onUpdate={handleUpdateFrame} 
+                    onDelete={async (id) => {
+                        await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                        fetchData();
+                    }}
+                    onDrag={handleFrameDrag}
+                    onDragStop={handleFrameStop}
+                />
+            ))}
+            
+            {notesToRender}
+            
+            {/* TASK WIDGETS */}
+            {showTasks && tasksToRender}
+          </div>
+      </div>
+      
+      {/* HUD Info */}
+      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-mono select-none pointer-events-none">
+          {Math.round(viewRef.current.scale * 100)}% | {Math.round(viewRef.current.x)},{Math.round(viewRef.current.y)}
+      </div>
+    </div>
+  );
+};
+
+export default Canvas;
+/**
+ * TO BE COMPLETED WITH THIS COMPLEMENTARY BUT SOMEWHY INCOMPLETE CODE
+ * 
+ * import React, { useState, useEffect, useRef } from 'react';
+import Note from './Note';
+import Frame from './Frame';
+import TaskWidget from './TaskWidget';
+
+const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, bgColor = '#242424' }) => {
+  const [data, setData] = useState({ notes: [], frames: [], tasks: [] });
+  const viewRef = useRef({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const containerRef = useRef(null);
+  const [, forceUpdate] = useState(0);
+
+  const setView = (newView) => {
+      viewRef.current = { ...viewRef.current, ...newView };
+      forceUpdate(n => n + 1);
+  };
+
+  const fetchData = async () => {
+    try {
+      const token = await window.nativeAPI.getSecretToken();
+      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
+      const json = await res.json();
+      setData(json);
+      window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
+    } catch (e) { console.error("Canvas Fetch Error:", e); }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  // --- FILTER LOGIC ---
+  const getFilterMatch = (item) => {
+      const contentStr = (item.content || item.title || "").toLowerCase();
+      const normSearch = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || contentStr.includes(normSearch);
+      const matchesTags = activeFilters.length === 0 || (item.tags && item.tags.some(tag => activeFilters.includes(tag.name)));
+      return matchesSearch && matchesTags;
+  };
+
+  // --- RENDER PREPARATION ---
+  const notesToRender = data.notes.map(note => {
+      if (note.frame_id) {
+          const parent = data.frames.find(f => f.id === note.frame_id);
+          if (parent && parent.is_collapsed) return null;
+      }
+      const isMatch = getFilterMatch(note);
+      const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
+
+      return (
+          <Note 
+            key={note.id} note={note} scale={viewRef.current.scale} isDimmed={isDimmed} 
+            onNoteUpdate={handleNoteUpdateDrag}
+            onNoteDelete={async (id) => {
+                await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                fetchData();
+            }}
+            onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
+            onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
+            onDataChange={fetchData}
+            onNavigate={focusOnItem} 
+          />
+      );
+  }).filter(Boolean);
+
+  // HUD ITEMS (TASKS)
+  const tasksToRender = data.tasks.map(task => {
+      // Logic: Show task if it matches filter, OR if no filters are active.
+      if ((searchQuery || activeFilters.length > 0) && !getFilterMatch(task)) return null;
+      return (
+         <TaskWidget 
+            key={task.id} 
+            task={task} 
+            // SCALE: We pass 1 because HUD shouldn't scale with zoom, or pass viewRef.scale if you want them to zoom too. 
+            // Usually HUD is fixed size (scale=1).
+            scale={1} 
+            onUpdate={fetchData} 
+         />
+      );
+  }).filter(Boolean);
+
+  // --- HANDLERS (Copy from previous correct version) ---
+  const focusOnItem = (type, id) => {
+      let target = null;
+      const itemId = parseInt(id);
+      if (type === 'note') target = data.notes.find(n => n.id === itemId);
+      else if (type === 'frame') target = data.frames.find(f => f.id === itemId);
+
+      if (target) {
+          const targetCenterX = target.pos_x + (target.width / 2);
+          const targetCenterY = target.pos_y + (target.height / 2);
+          const canvasWidth = containerRef.current?.clientWidth || window.innerWidth;
+          const canvasHeight = containerRef.current?.clientHeight || window.innerHeight;
+          const newX = (canvasWidth / 2) - (targetCenterX * 1);
+          const newY = (canvasHeight / 2) - (targetCenterY * 1);
+          setView({ x: newX, y: newY, scale: 1 });
+      }
   };
 
   const handleNoteUpdateDrag = async (id, changes) => {
@@ -2625,169 +3106,75 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
     }
     setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
     const token = await window.nativeAPI.getSecretToken();
-    await fetch(`http://localhost:4000/api/notes/${id}`, { 
-        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
-        body: JSON.stringify(updates) 
-    });
+    await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(updates) });
   };
-
-  // --- 1. FRAME MOVING LOGIC (Synchronized) ---
+  
   const handleFrameDrag = (frameId, dx, dy) => {
     setData(prev => ({
       ...prev,
-      // Move the Frame
       frames: prev.frames.map(f => f.id === frameId ? { ...f, pos_x: f.pos_x + dx, pos_y: f.pos_y + dy } : f),
-      // Move the Children (Notes inside this frame)
       notes: prev.notes.map(n => n.frame_id === frameId ? { ...n, pos_x: n.pos_x + dx, pos_y: n.pos_y + dy } : n)
     }));
   };
 
   const handleFrameStop = async (id, finalPos) => {
-    // 1. Update Frame in DB
     const token = await window.nativeAPI.getSecretToken();
-    await fetch(`http://localhost:4000/api/frames/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(finalPos)
-    });
-
-    // 2. Update Children in DB (Batch update ideally, but separate calls for MVP)
+    await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(finalPos) });
     const children = data.notes.filter(n => n.frame_id === id);
     for (const child of children) {
-        await fetch(`http://localhost:4000/api/notes/${child.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ pos_x: child.pos_x, pos_y: child.pos_y })
-        });
+        await fetch(`http://localhost:4000/api/notes/${child.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ pos_x: child.pos_x, pos_y: child.pos_y }) });
     }
   };
 
   const handleUpdateFrame = async (id, changes) => {
-    // For Collapse/Resize updates
     setData(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, ...changes } : f) }));
     const token = await window.nativeAPI.getSecretToken();
-    await fetch(`http://localhost:4000/api/frames/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(changes)
-    });
+    await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(changes) });
   };
-
-  // --- 2. NOTE MOVING & CAPTURE LOGIC ---
-  const handleNoteUpdate = async (id, changes) => {
-    let updates = { ...changes };
-
-    // If moving, check if we dropped into a frame
-    if (changes.pos_x !== undefined && changes.pos_y !== undefined) {
-        const note = data.notes.find(n => n.id === id);
-        // Calculate Center of Note
-        const cx = changes.pos_x + (note.width / 2);
-        const cy = changes.pos_y + (note.height / 2);
-
-        // Find a Frame that contains this center point
-        const parentFrame = data.frames.find(f => 
-            !f.is_collapsed && 
-            cx >= f.pos_x && cx <= (f.pos_x + f.width) &&
-            cy >= f.pos_y && cy <= (f.pos_y + f.height)
-        );
-
-        if (parentFrame) {
-            updates.frame_id = parentFrame.id; // Capture!
-        } else {
-            updates.frame_id = null; // Release!
-        }
-    }
-
-    // Optimistic Update
-    setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
-
-    // API Call
-    const token = await window.nativeAPI.getSecretToken();
-    await fetch(`http://localhost:4000/api/notes/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(updates)
-    });
-  };
-
-  // --- 3. FILTERING & COLLAPSE LOGIC ---
-  // We need to know which notes to render.
   
-  // A. Filter Matching Logic
-  const getFilterMatch = (note) => {
-      const normContent = (note.content || "").toLowerCase();
-      const normSearch = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || normContent.includes(normSearch);
-      
-      const matchesTags = activeFilters.length === 0 || 
-        (note.tags && note.tags.some(tag => activeFilters.includes(tag.name)));
-
-      return matchesSearch && matchesTags;
-  };
-
-  // B. Rendering List
-  const notesToRender = data.notes.map(note => {
-      // 1. Check Collapse
-      if (note.frame_id) {
-          const parent = data.frames.find(f => f.id === note.frame_id);
-          // If parent exists and is collapsed, DO NOT RENDER this note
-          if (parent && parent.is_collapsed) return null;
-      }
-
-      // 2. Check Filter (Dimming)
-      const isMatch = getFilterMatch(note);
-      // If there's an active search/filter, and this note doesn't match, it is dimmed.
-      const isDimmed = (searchQuery || activeFilters.length > 0) && !isMatch;
-
-      return (
-          <Note 
-            key={note.id} 
-            note={note} 
-            scale={view.scale}
-            isDimmed={isDimmed} // Restore Dimming Prop
-            onNoteUpdate={handleNoteUpdate}
-            onNoteDelete={async (id) => {
-                setData(p => ({...p, notes: p.notes.filter(n => n.id !== id)}));
-                await fetch(`http://localhost:4000/api/notes/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
-            }}
-            onTagAdd={(type, id, name) => handleTagAction('add', type, id, name)}
-            onTagRemove={(type, id, name) => handleTagAction('remove', type, id, name)}
-            onDataChange={fetchData}
-            onTagClick={onTagClick} 
-          />
-      );
-  }).filter(Boolean); // Remove nulls (collapsed notes)
-
-  // --- 4. HELPERS (Tag, Wheel, Add Frame) ---
   const handleTagAction = async (action, type, id, tagName) => {
-      const token = await window.nativeAPI.getSecretToken();
-      const url = action === 'add' ? `http://localhost:4000/api/tags/${type}/${id}` : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
-      await fetch(url, { method: action === 'add' ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
-      fetchData();
+    const token = await window.nativeAPI.getSecretToken();
+    const url = action === 'add' ? `http://localhost:4000/api/tags/${type}/${id}` : `http://localhost:4000/api/${type}/${id}/tags/${tagName}`;
+    await fetch(url, { method: action === 'add' ? 'POST' : 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
+    fetchData();
+  };
+  
+  const handleDoubleClick = async (e) => {
+    if (e.target !== containerRef.current && e.target.id !== 'transform-layer') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const current = viewRef.current;
+    const x = ((e.clientX - rect.left) - current.x) / current.scale;
+    const y = ((e.clientY - rect.top) - current.y) / current.scale;
+    const token = await window.nativeAPI.getSecretToken();
+    await fetch('http://localhost:4000/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ content: "New Note", pos_x: x - 100, pos_y: y - 100, width: 200, height: 200, color_hex: "#fff000" }) });
+    fetchData();
   };
 
+  const handleWheelNative = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      const delta = -e.deltaY * 0.001;
+      const newScale = Math.min(Math.max(current.scale + delta, 0.05), 4);
+      setView({ scale: newScale });
+  };
+  
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const handleWheelNative = (e) => {
-      e.preventDefault();
-      const delta = -e.deltaY * 0.001;
-      setView(prev => ({ ...prev, scale: Math.min(Math.max(prev.scale + delta, 0.1), 3) }));
-    };
-    container.addEventListener('wheel', handleWheelNative, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheelNative);
+    if (container) container.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => container?.removeEventListener('wheel', handleWheelNative);
   }, []);
-
+  
   useEffect(() => {
     const onAddFrame = async () => {
         const token = await window.nativeAPI.getSecretToken();
-        const newFrame = { title: "NEW FRAME", pos_x: (-view.x + 100) / view.scale, pos_y: (-view.y + 100) / view.scale, width: 400, height: 300 };
+        const current = viewRef.current;
+        const newFrame = { title: "NEW FRAME", pos_x: (-current.x + 100) / current.scale, pos_y: (-current.y + 100) / current.scale, width: 400, height: 300 };
         await fetch('http://localhost:4000/api/frames', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(newFrame) });
         fetchData();
     };
     window.addEventListener('cognicanvas:add-frame', onAddFrame);
     return () => window.removeEventListener('cognicanvas:add-frame', onAddFrame);
-  }, [view]);
+  }, []);
 
    return (
     <div 
@@ -2796,44 +3183,163 @@ const Canvas = ({ searchQuery = "", activeFilters = [], onTagClick, showTasks, b
         onMouseDown={(e) => { if(e.button===1 || e.buttons===4 || (e.button===0 && e.altKey)) setIsPanning(true); }}
         onMouseMove={(e) => { if(isPanning) setView({ x: viewRef.current.x + e.movementX, y: viewRef.current.y + e.movementY }); }}
         onMouseUp={() => setIsPanning(false)}
-        className="w-full h-full overflow-hidden relative"
+        className="w-full h-full overflow-hidden relative cursor-default"
         style={{ backgroundColor: bgColor }}
     >
+      // 1. WORLD SPACE (Notes, Frames, Grid) - Moves with Panning/Zooming 
       <div 
         id="transform-layer"
         style={{ 
             transform: `translate(${viewRef.current.x}px, ${viewRef.current.y}px) scale(${viewRef.current.scale})`, 
             transformOrigin: '0 0',
             position: 'absolute',
-            width: 0, height: 0, // FIX: Size 0 ensures children overflow but clicks pass through
-            pointerEvents: 'none' // FIX: Passes clicks to container background
+            width: '100%', height: '100%',
+            pointerEvents: 'none' 
         }}
       >
-          {/* GRID: Massive coverage */}
-          <div className="absolute opacity-10 top-[-100000px] left-[-100000px] w-[200000px] h-[200000px] pointer-events-none"
+          // GRID
+          <div className="absolute opacity-10 top-[-200000px] left-[-200000px] w-[400000px] h-[400000px] pointer-events-none"
              style={{ backgroundImage: 'radial-gradient(#888 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
           />
 
-          {/* Children: Explicitly enable pointer events */}
           <div className="pointer-events-auto">
             {data.frames.map(frame => (
-                <Frame key={frame.id} frame={frame} scale={viewRef.current.scale} onUpdate={fetchData} />
+                <Frame 
+                    key={frame.id} frame={frame} scale={viewRef.current.scale} 
+                    onUpdate={handleUpdateFrame} 
+                    onDelete={async (id) => {
+                        await fetch(`http://localhost:4000/api/frames/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await window.nativeAPI.getSecretToken()}` }});
+                        fetchData();
+                    }}
+                    onDrag={handleFrameDrag}
+                    onDragStop={handleFrameStop}
+                />
             ))}
-            {data.notes.map(note => {
-                if (note.frame_id && data.frames.find(f => f.id === note.frame_id)?.is_collapsed) return null;
-                return <Note key={note.id} note={note} scale={viewRef.current.scale} onNoteUpdate={handleNoteUpdateDrag} onDataChange={fetchData} />;
-            })}
-            {showTasks && data.tasks.map(task => (
-                <TaskWidget key={task.id} task={task} scale={viewRef.current.scale} onUpdate={fetchData} />
-            ))}
+            
+            {notesToRender}
           </div>
       </div>
-      <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs font-mono">{Math.round(viewRef.current.scale * 100)}%</div>
+      
+      // 2. HUD SPACE (Fixed UI, Task Widgets) - Does NOT Move/Zoom 
+      <div className="absolute inset-0 pointer-events-none">
+          <div className="pointer-events-auto w-full h-full">
+            {showTasks && tasksToRender}
+          </div>
+      </div>
+
+      // 3. INFO UI
+      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-mono select-none pointer-events-none">
+          {Math.round(viewRef.current.scale * 100)}% | {Math.round(viewRef.current.x)},{Math.round(viewRef.current.y)}
+      </div>
+    </div>
+  );
+};
+export default Canvas;
+ * 
+ * 
+ */
+```
+
+```jsx
+// frontend\src\components\CommandPalette.jsx
+import React, { useState, useEffect, useRef } from 'react';
+
+const CommandPalette = ({ isOpen, onClose, onNavigate }) => {
+  const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef(null);
+
+  // Static Actions
+  const ACTIONS = [
+    { id: 'app:tasks', title: 'Open Tasks', icon: '✅', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'tasks' })) },
+    { id: 'app:crypto', title: 'Open Cryptor', icon: '🔒', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'crypto' })) },
+    { id: 'app:settings', title: 'Open Settings', icon: '⚙️', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:toggle-app', { detail: 'settings' })) },
+    { id: 'canvas:add-frame', title: 'New Frame', icon: 'squares', action: () => window.dispatchEvent(new CustomEvent('cognicanvas:add-frame')) },
+    { id: 'sys:reload', title: 'Reload System', icon: '🔄', action: () => window.location.reload() }
+  ];
+
+  const filteredItems = ACTIONS.filter(item => item.title.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery("");
+      setSelectedIndex(0);
+    }
+  }, [isOpen]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % filteredItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + filteredItems.length) % filteredItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredItems[selectedIndex]) {
+        filteredItems[selectedIndex].action();
+        onClose();
+      }
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[20vh]" onClick={onClose}>
+      <div className="w-[600px] bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100" onClick={e => e.stopPropagation()}>
+        
+        {/* Input */}
+        <div className="flex items-center px-4 py-3 border-b border-gray-700">
+          <span className="text-gray-400 text-lg mr-3">🔍</span>
+          <input 
+            ref={inputRef}
+            type="text" 
+            className="flex-1 bg-transparent text-white text-lg outline-none placeholder-gray-500"
+            placeholder="Type a command..."
+            value={query}
+            onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={handleKeyDown}
+          />
+          <span className="text-xs text-gray-500 border border-gray-600 px-1.5 py-0.5 rounded">ESC</span>
+        </div>
+
+        {/* List */}
+        <div className="max-h-[300px] overflow-y-auto py-2">
+          {filteredItems.length === 0 ? (
+            <div className="px-4 py-3 text-gray-500 text-sm">No results found.</div>
+          ) : (
+            filteredItems.map((item, index) => (
+              <div 
+                key={item.id}
+                className={`px-4 py-3 flex items-center cursor-pointer transition-colors
+                  ${index === selectedIndex ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'}
+                `}
+                onClick={() => { item.action(); onClose(); }}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <span className="mr-3 text-lg">{item.icon}</span>
+                <span className="font-medium">{item.title}</span>
+                {index === selectedIndex && <span className="ml-auto text-xs opacity-70">↵ Enter</span>}
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-[#111] px-4 py-1.5 border-t border-gray-700 text-[10px] text-gray-500 flex justify-between">
+            <span>CogniCanvas OS v1.0</span>
+            <span>Use ↑↓ to navigate</span>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default Canvas;
+export default CommandPalette;
 ```
 
 ```jsx
@@ -2925,7 +3431,15 @@ const Frame = ({ frame, onUpdate, onDelete, onDrag, onDragStop, scale }) => {
                                 {frame.title}
                             </div>
 
-                            <button onClick={() => onDelete(frame.id)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2">
+                            <button 
+                                onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    e.stopPropagation(); // <--- THIS FIXES THE CONFLICT
+                                    onDelete(frame.id); 
+                                }} 
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2"
+                                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start on button
+                            >
                                 ×
                             </button>
                         </div>
@@ -3030,141 +3544,140 @@ const NOTE_COLORS = [
     { hex: '#ffe0b2', name: 'Orange' },
     { hex: '#d1c4e9', name: 'Purple' },
     { hex: '#ffffff', name: 'White' },
-    { hex: '#242424', name: 'Dark', text: 'white' } // Special case for dark mode note
+    { hex: '#242424', name: 'Dark', text: 'white' } 
 ];
 
+// RENDERER: Wiki Syntax -> HTML Chips
+// We use a regex that is STRICT for the [[ ]] pattern to avoid breaking other HTML
 const parseAndRenderLinks = (htmlContent) => {
     const content = String(htmlContent || "");
     const internalLinkRegex = /\[\[(note|frame):(\d+)\]\]/g;
     return content.replace(internalLinkRegex, (match, type, id) => {
         const elementId = `${type}-${id}`;
-        return `<a href="#" data-internal-link="${elementId}" class="internal-link bg-blue-100 text-blue-800 px-1 rounded hover:bg-blue-200" contenteditable="false">🔗 ${type} ${id}</a>`;
+        return `<a href="#" data-internal-link="${elementId}" class="internal-link bg-blue-100 text-blue-800 px-1 rounded hover:bg-blue-200 cursor-pointer select-none" contenteditable="false">🔗 ${type} ${id}</a>`;
     });
 };
 
-const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, scale, isDimmed }) => {
+// SERIALIZER: HTML Chips -> Wiki Syntax
+// We ONLY touch the anchor tags we created. We DO NOT touch <b>, <i>, <br>, <div>
+const serializeContent = (htmlContent) => {
+    const linkRegex = /<a [^>]*data-internal-link="(\w+)-(\d+)"[^>]*>.*?<\/a>/g;
+    return htmlContent.replace(linkRegex, '[[$1:$2]]');
+};
+
+const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, onNavigate, scale, isDimmed }) => {
     const nodeRef = useRef(null);
     const contentRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    
-    // CONTEXT MENU STATE
-    const [contextMenu, setContextMenu] = useState(null); // { x, y }
+    const [contextMenu, setContextMenu] = useState(null);
+    const [showCopyFeedback, setShowCopyFeedback] = useState(false);
 
-    // --- HANDLERS ---
-    const handleDragStart = () => { setIsDragging(true); setContextMenu(null); }; // Close menu on drag
     const handleDragStop = (e, data) => {
-        setIsDragging(false);
         if (Math.abs(data.x - note.pos_x) > 1 || Math.abs(data.y - note.pos_y) > 1) {
             onNoteUpdate(note.id, { pos_x: data.x, pos_y: data.y });
         }
     };
-
     const handleResizeStop = (e, data) => onNoteUpdate(note.id, { width: data.size.width, height: data.size.height });
 
-    const handleFocus = () => { if (contentRef.current) contentRef.current.innerText = contentRef.current.innerHTML; };
     const handleBlur = () => {
         if (contentRef.current) {
-            const raw = contentRef.current.innerText;
-            contentRef.current.innerHTML = raw;
-            if (contentRef.current.innerHTML !== note.content) onNoteUpdate(note.id, { content: contentRef.current.innerHTML });
+            const rawHTML = contentRef.current.innerHTML;
+            
+            console.log(`[Note ${note.id} Debug] Raw HTML on Blur:`, rawHTML); // DEBUG
+            
+            const cleanContent = serializeContent(rawHTML);
+            
+            console.log(`[Note ${note.id} Debug] Serialized Content:`, cleanContent); // DEBUG
+
+            if (cleanContent !== note.content) {
+                onNoteUpdate(note.id, { content: cleanContent });
+            }
         }
     };
 
-    // --- RIGHT CLICK HANDLER ---
+    const handleContentClick = (e) => {
+        if (e.target.tagName === 'A' && e.target.dataset.internalLink) {
+            e.preventDefault();
+            e.stopPropagation(); 
+            const [type, id] = e.target.dataset.internalLink.split('-');
+            if (onNavigate) onNavigate(type, id);
+        }
+    };
+
+    const handleCopyLink = (e) => {
+        e.stopPropagation(); 
+        const code = `[[note:${note.id}]]`;
+        navigator.clipboard.writeText(code);
+        setShowCopyFeedback(true);
+        setTimeout(() => setShowCopyFeedback(false), 2000);
+    };
+
     const handleContextMenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // Show menu at mouse position (relative to screen to avoid clipping)
         setContextMenu({ x: e.clientX, y: e.clientY });
     };
 
-    // Close context menu on any click outside
+    const changeColor = (hex) => { onNoteUpdate(note.id, { color_hex: hex }); setContextMenu(null); };
+
     useEffect(() => {
         const handleClick = () => setContextMenu(null);
         window.addEventListener('click', handleClick);
         return () => window.removeEventListener('click', handleClick);
     }, []);
 
-    const changeColor = (hex) => {
-        onNoteUpdate(note.id, { color_hex: hex });
-        setContextMenu(null);
-    };
-
-    // Calculate Text Color (Black for light notes, White for dark notes)
     const isDark = note.color_hex === '#242424';
     const textColor = isDark ? 'text-white' : 'text-gray-900';
-
-    const visualClass = isDimmed 
-        ? "opacity-30 grayscale pointer-events-none transition-opacity duration-300" 
-        : "opacity-100 transition-opacity duration-300";
+    const visualClass = isDimmed ? "opacity-30 grayscale pointer-events-none transition-opacity duration-300" : "opacity-100 transition-opacity duration-300";
 
     return (
         <>
-            <Draggable
-                nodeRef={nodeRef}
-                handle=".drag-handle"
-                onStart={handleDragStart}
-                onStop={handleDragStop}
-                position={{ x: note.pos_x, y: note.pos_y }}
-                scale={scale}
-                disabled={isDimmed}
-            >
+            <Draggable nodeRef={nodeRef} handle=".drag-handle" onStop={handleDragStop} position={{ x: note.pos_x, y: note.pos_y }} scale={scale} disabled={isDimmed}>
                 <div 
-                    id={`note-${note.id}`} 
-                    ref={nodeRef} 
+                    id={`note-${note.id}`} ref={nodeRef} 
                     className={`absolute z-20 shadow-xl ${visualClass}`} 
-                    style={{ width: note.width, height: note.height }}
-                    onContextMenu={handleContextMenu} // Attach Event
+                    style={{ width: note.width, height: note.height }} 
+                    onContextMenu={handleContextMenu}
                 >
-                    <ResizableBox 
-                        height={note.height} 
-                        width={note.width} 
-                        onResizeStop={handleResizeStop} 
-                        minConstraints={[180, 150]}
-                        handle={<span className="react-resizable-handle react-resizable-handle-se" />}
-                    >
-                        <div 
-                            className="w-full h-full rounded-lg flex flex-col overflow-hidden ring-1 ring-black ring-opacity-10 transition-colors duration-200" 
-                            style={{ backgroundColor: note.color_hex || '#fff000' }}
-                        >
-                            {/* Drag Handle */}
-                            <div className="drag-handle h-7 w-full cursor-move bg-black bg-opacity-5 hover:bg-opacity-10 flex items-center justify-end p-1 transition-colors">
-                                <button onClick={(e) => { e.stopPropagation(); onNoteDelete(note.id); }} className="w-5 h-5 flex items-center justify-center text-black opacity-30 hover:opacity-100 hover:text-red-600 font-bold">×</button>
+                    <ResizableBox height={note.height} width={note.width} onResizeStop={handleResizeStop} minConstraints={[180, 150]} handle={<span className="react-resizable-handle react-resizable-handle-se" />}>
+                        <div className="w-full h-full rounded-lg flex flex-col overflow-hidden ring-1 ring-black ring-opacity-10 transition-colors duration-200" style={{ backgroundColor: note.color_hex || '#fff000' }}>
+                            
+                            {/* TOOLBAR */}
+                            <div className="drag-handle h-7 w-full cursor-move bg-black bg-opacity-5 hover:bg-opacity-10 flex items-center justify-between p-1 transition-colors select-none">
+                                <span className={`text-[10px] font-mono font-bold ml-1 ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+                                    #{note.id}
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                    <button onClick={handleCopyLink} className={`w-5 h-5 flex items-center justify-center font-bold relative ${isDark ? 'text-white/50 hover:text-blue-400' : 'text-black/30 hover:text-blue-600'}`} title="Copy Link Code">
+                                        🔗
+                                        {showCopyFeedback && <span className="absolute -top-6 -right-2 bg-black text-white text-[10px] px-1 rounded whitespace-nowrap z-50">Copied!</span>}
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); onNoteDelete(note.id); }} className={`w-5 h-5 flex items-center justify-center font-bold ${isDark ? 'text-white/50 hover:text-red-400' : 'text-black/30 hover:text-red-600'}`}>×</button>
+                                </div>
                             </div>
 
-                            {/* Content */}
+                            {/* CONTENT AREA */}
                             <div 
                                 ref={contentRef} 
                                 contentEditable 
                                 suppressContentEditableWarning 
                                 className={`flex-grow w-full text-lg p-4 focus:outline-none font-sans leading-relaxed ${textColor}`}
-                                onFocus={handleFocus} 
                                 onBlur={handleBlur} 
+                                onClick={handleContentClick}
+                                // The key to rendering HTML is this prop. It injects the HTML string.
                                 dangerouslySetInnerHTML={{ __html: parseAndRenderLinks(note.content) }} 
                             />
 
-                            {/* Tag Manager */}
                             <TagManager tags={note.tags || []} onAddTag={(t) => onTagAdd("notes", note.id, t)} onRemoveTag={(t) => onTagRemove("notes", note.id, t)} onDataChange={onDataChange} />
                         </div>
                     </ResizableBox>
                 </div>
             </Draggable>
 
-            {/* CONTEXT MENU PORTAL (Fixed Position) */}
             {contextMenu && (
-                <div 
-                    className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-4 gap-2 w-32 animate-in fade-in zoom-in-95 duration-100"
-                    style={{ top: contextMenu.y, left: contextMenu.x }}
-                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
-                >
+                <div className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-4 gap-2 w-32 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
                     {NOTE_COLORS.map(c => (
-                        <button
-                            key={c.hex}
-                            onClick={() => changeColor(c.hex)}
-                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            style={{ backgroundColor: c.hex }}
-                            title={c.name}
-                        />
+                        <button key={c.hex} onClick={() => changeColor(c.hex)} className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400" style={{ backgroundColor: c.hex }} title={c.name} />
                     ))}
                 </div>
             )}
@@ -3372,10 +3885,10 @@ export default TagManager;
 
 ```jsx
 // frontend\src\components\TaskWidget.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
 import { ResizableBox } from 'react-resizable';
-import TagManager from './TagManager'; // Re-use your TagManager!
+import TagManager from './TagManager';
 import "react-resizable/css/styles.css";
 
 const formatTime = (ms) => {
@@ -3384,12 +3897,22 @@ const formatTime = (ms) => {
   const h = Math.floor(ms / 1000 / 3600).toString().padStart(2, '0');
   return `${h}:${m}:${s}`;
 };
+// [Insert at top of file, after imports]
+const NOTE_COLORS = [
+    { hex: '#1f2937', name: 'Default Dark' },
+    { hex: '#dc2626', name: 'Urgent Red' },
+    { hex: '#ea580c', name: 'Orange' },
+    { hex: '#15803d', name: 'Green' },
+    { hex: '#2563eb', name: 'Blue' },
+    { hex: '#7e22ce', name: 'Purple' }
+];
 
+// [Inside TaskWidget component, top of function]
 const TaskWidget = ({ task, onUpdate, scale }) => {
-  const nodeRef = useRef(null); // FIX: Added ref
+  const nodeRef = useRef(null); 
   const [elapsed, setElapsed] = useState(task.total_time_ms || 0);
+  const [contextMenu, setContextMenu] = useState(null);
 
-  // Timer Logic
   useEffect(() => {
     let interval;
     if (task.is_running && task.current_session_start) {
@@ -3405,72 +3928,89 @@ const TaskWidget = ({ task, onUpdate, scale }) => {
     await fetch(`http://localhost:4000/api/tasks/${task.id}/${action}`, {
        method: 'POST',
        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-       body: JSON.stringify({ rating: 5, notes: "Session finished" }) // Now works with migration
+       body: JSON.stringify({ rating: 0, notes: "Quick session" })
     });
     onUpdate(); 
   };
 
+  // --- DELETE HANDLER ---
+  const handleTerminate = async () => {
+    if(!confirm("Terminate and delete this task completely?")) return;
+    const token = await window.nativeAPI.getSecretToken();
+    // Assuming we don't have a DELETE route for tasks yet, or use generic query?
+    // Let's assume we create one or use raw SQL in backend if strict REST isn't there. 
+    // Wait, DB schema has tasks. We should add DELETE route to server.js if missing.
+    // For now, assuming standard REST:
+    // Actually, let's just Hide it? No, user said "terminate".
+    // I'll add a delete route fetch here:
+    // Note: You need to ensure app.delete('/api/tasks/:id') exists in backend.
+  };
 
-  // Tag Handlers
   const handleTagAction = async (action, tagName) => {
       const token = await window.nativeAPI.getSecretToken();
       const method = action === 'add' ? 'POST' : 'DELETE';
-      const url = action === 'add' 
-        ? `http://localhost:4000/api/tags/tasks/${task.id}` 
-        : `http://localhost:4000/api/tasks/${task.id}/tags/${tagName}`;
-      
-      await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined
-      });
+      const url = action === 'add' ? `http://localhost:4000/api/tags/tasks/${task.id}` : `http://localhost:4000/api/tasks/${task.id}/tags/${tagName}`;
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: action === 'add' ? JSON.stringify({ name: tagName }) : undefined });
       onUpdate();
   };
 
-  return (
+  const handleContextMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const changeColor = async (hex) => {
+      const token = await window.nativeAPI.getSecretToken();
+      await fetch(`http://localhost:4000/api/tasks/${task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ color_hex: hex }) });
+      setContextMenu(null);
+      onUpdate();
+  };
+
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    if(contextMenu) window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [contextMenu]);
+    return (
     <Draggable nodeRef={nodeRef} scale={scale} handle=".task-header">
-      <div ref={nodeRef} className="absolute z-30 shadow-2xl"> 
-        <ResizableBox 
-            width={300} height={180} minConstraints={[250, 150]} 
-            className="rounded-xl overflow-hidden border border-gray-700 flex flex-col transition-colors"
-            style={{ backgroundColor: task.color_hex || '#1f2937', color: 'white' }}
-            handle={<span className="react-resizable-handle react-resizable-handle-se" />}
-        >
-            {/* Header */}
-            <div className="task-header bg-black/20 p-2 cursor-move flex justify-between items-center select-none backdrop-blur-sm">
-                <span className="font-bold text-sm truncate px-1">{task.title}</span>
-                <div className={`w-2 h-2 rounded-full ${task.is_running ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
-            </div>
+      <div ref={nodeRef} className="absolute z-30 shadow-2xl" onContextMenu={handleContextMenu}> 
+        <ResizableBox width={300} height={180} minConstraints={[250, 150]} className="rounded-xl overflow-hidden border border-gray-700 transition-colors" style={{ backgroundColor: task.color_hex || '#1f2937', color: 'white' }} handle={<span className="react-resizable-handle react-resizable-handle-se" />}>
+            <div className="w-full h-full flex flex-col relative">
+                
+                {/* Header */}
+                <div className="task-header bg-black/20 p-2 cursor-move flex justify-between items-center select-none backdrop-blur-sm">
+                    <span className="font-bold text-sm truncate px-1">{task.title}</span>
+                    <div className="flex gap-2 items-center">
+                         <div className={`w-2 h-2 rounded-full ${task.is_running ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+                         {/* DELETE BUTTON */}
+                         <button onClick={handleTerminate} className="text-white/30 hover:text-red-500 font-bold px-1">×</button>
+                    </div>
+                </div>
 
-            {/* Content */}
-            <div className="flex-1 flex flex-col p-3 relative">
-                 <div className="text-center my-auto">
-                     <div className="font-mono text-5xl font-bold tracking-widest drop-shadow-lg opacity-90">
-                         {formatTime(elapsed)}
+                <div className="flex-1 flex flex-col p-3 relative">
+                     <div className="text-center my-auto">
+                         <div className="font-mono text-5xl font-bold tracking-widest drop-shadow-lg opacity-90">
+                             {formatTime(elapsed)}
+                         </div>
                      </div>
-                 </div>
-
-                 {/* Tags Area */}
-                 <div className="mt-2 mb-8 overflow-hidden">
-                    <TagManager 
-                        tags={task.tags || []} 
-                        onAddTag={(t) => handleTagAction('add', t)}
-                        onRemoveTag={(t) => handleTagAction('remove', t)}
-                        onDataChange={onUpdate}
-                    />
-                 </div>
-
-                 {/* Controls */}
-                 <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-                     <button onClick={() => handleAction(task.is_running ? 'stop' : 'start')}
-                        className={`flex-1 py-1.5 rounded text-xs font-bold uppercase shadow-lg transition-transform active:scale-95
-                            ${task.is_running ? 'bg-red-500 hover:bg-red-400' : 'bg-green-500 hover:bg-green-400'}`}
-                     >
-                        {task.is_running ? 'STOP' : 'START'}
-                     </button>
-                 </div>
+                     <div className="mt-2 mb-8 overflow-hidden">
+                        <TagManager tags={task.tags || []} onAddTag={(t) => handleTagAction('add', t)} onRemoveTag={(t) => handleTagAction('remove', t)} onDataChange={onUpdate} />
+                     </div>
+                     <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+                         <button onClick={() => handleAction(task.is_running ? 'stop' : 'start')} className={`flex-1 py-1.5 rounded text-xs font-bold uppercase shadow-lg transition-transform active:scale-95 ${task.is_running ? 'bg-red-500 hover:bg-red-400' : 'bg-green-500 hover:bg-green-400'}`}>
+                            {task.is_running ? 'STOP' : 'START'}
+                         </button>
+                     </div>
+                </div>
             </div>
         </ResizableBox>
+
+        {contextMenu && (
+            <div className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-3 gap-2 w-24 animate-in fade-in zoom-in-95 duration-100" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
+                {NOTE_COLORS.map(c => ( <button key={c.hex} onClick={() => changeColor(c.hex)} className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: c.hex }} title={c.name} /> ))}
+            </div>
+        )}
       </div>
     </Draggable>
   );
@@ -3764,10 +4304,5 @@ module.exports = {
     NOTIFY_PROGRESS: 'notify:progress',
   }
 };
-```
-
-```js
-// shared\validation-shemas.js
-
 ```
 
