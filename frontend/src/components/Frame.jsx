@@ -1,107 +1,106 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Draggable from "react-draggable";
 import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
 
-// DESTUCTURING onDrag HERE is critical to fix your error
-const Frame = ({ frame, onUpdate, onDelete, onDrag, onDragStop, scale }) => {
-    const nodeRef = useRef(null);
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
+const Frame = ({ frame, scale, onUpdate, onDelete, onDrag, onDragStop }) => {
+  const nodeRef = useRef(null); // StrictMode compliance
+  const [title, setTitle] = useState(frame.title);
 
-    // 1. Handle Dragging (Movement)
-    const handleDrag = (e, data) => {
-        // We pass the ID and the movement deltas to the parent
-        if (onDrag) {
-            onDrag(frame.id, data.deltaX, data.deltaY);
-        }
-    };
+  // Sync internal state if props change externally
+  useEffect(() => {
+    setTitle(frame.title);
+  }, [frame.title]);
 
-    // 2. Handle Stop (Save to DB)
-    const handleStop = (e, data) => {
-        if (onDragStop) {
-            onDragStop(frame.id, { pos_x: data.x, pos_y: data.y });
-        }
-    };
+  const handleResizeStop = (e, data) => {
+    onUpdate(frame.id, { width: data.size.width, height: data.size.height });
+  };
 
-    const handleResizeStop = (e, data) => {
-        onUpdate(frame.id, { width: data.size.width, height: data.size.height });
-    };
+  const handleTitleBlur = () => {
+    if (title !== frame.title) {
+      onUpdate(frame.id, { title });
+    }
+  };
 
-    const toggleCollapse = () => {
-        // Toggle the boolean state (0 or 1 for SQLite)
-        onUpdate(frame.id, { is_collapsed: frame.is_collapsed ? 0 : 1 });
-    };
+  const toggleCollapse = () => {
+    onUpdate(frame.id, { is_collapsed: !frame.is_collapsed });
+  };
 
-    const handleTitleBlur = (e) => {
-        setIsEditingTitle(false);
-        if (e.target.innerText !== frame.title) {
-            onUpdate(frame.id, { title: e.target.innerText });
-        }
-    };
-
-    return (
-        <Draggable
-            nodeRef={nodeRef}
-            handle=".frame-header"
-            // Use local state position or props position? 
-            // Props position is safer for synchronized movement with children
-            position={{ x: frame.pos_x, y: frame.pos_y }}
-            scale={scale}
-            onDrag={handleDrag} // Fires on every pixel move
-            onStop={handleStop} // Fires when you let go
+  return (
+    <Draggable
+      nodeRef={nodeRef}
+      handle=".frame-handle"
+      position={{ x: frame.pos_x, y: frame.pos_y }}
+      scale={scale}
+      onDrag={(e, data) => onDrag(frame.id, data.deltaX, data.deltaY)} // Real-time visual sync for children
+      onStop={(e, data) => onDragStop(frame.id, { pos_x: data.x, pos_y: data.y })} // Persist on stop
+    >
+      <div
+        ref={nodeRef}
+        className="absolute z-10 group"
+        style={{
+          width: frame.width,
+          height: frame.is_collapsed ? 'auto' : frame.height,
+        }}
+      >
+        <ResizableBox
+          width={frame.width}
+          height={frame.is_collapsed ? 50 : frame.height}
+          onResizeStop={handleResizeStop}
+          minConstraints={[200, 50]}
+          resizeHandles={frame.is_collapsed ? ['e'] : ['se', 'e', 's']}
+          handle={
+             !frame.is_collapsed && 
+             <span className="react-resizable-handle react-resizable-handle-se opacity-0 group-hover:opacity-100 transition-opacity" />
+          }
         >
-            <div 
-                ref={nodeRef} 
-                className="absolute z-10 transition-opacity duration-200" 
-                style={{ 
-                    width: frame.width, 
-                    height: frame.is_collapsed ? 'auto' : frame.height 
-                }}
-            >
-                <ResizableBox 
-                    width={frame.width} 
-                    height={frame.is_collapsed ? 40 : frame.height} 
-                    onResizeStop={handleResizeStop}
-                    minConstraints={[200, 40]}
-                    axis={frame.is_collapsed ? "x" : "both"}
-                    handle={!frame.is_collapsed && <span className="react-resizable-handle react-resizable-handle-se" />}
+          <div className="w-full h-full border-2 border-dashed border-gray-400/30 rounded-xl flex flex-col bg-gray-500/5 hover:bg-gray-500/10 transition-colors backdrop-blur-sm">
+            
+            {/* HEADER / DRAG HANDLE */}
+            <div className="frame-handle h-10 flex items-center justify-between px-3 cursor-move bg-gray-700/20 rounded-t-xl select-none">
+              <div className="flex items-center gap-2 text-white/70">
+                <button 
+                   onClick={toggleCollapse}
+                   className="hover:text-white transition-colors text-xs"
                 >
-                    <div className="w-full h-full border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg flex flex-col bg-gray-50 bg-opacity-50">
-                        
-                        {/* HEADER */}
-                        <div className="frame-header h-10 bg-gray-200 flex items-center px-2 cursor-move group rounded-t-lg select-none">
-                            <button onClick={(e) => { e.stopPropagation(); toggleCollapse(); }} className="mr-2 text-gray-500 hover:text-black w-6 h-6 flex items-center justify-center font-bold">
-                                {frame.is_collapsed ? '▶' : '▼'}
-                            </button>
-
-                            <div 
-                                contentEditable
-                                suppressContentEditableWarning
-                                className="flex-grow font-bold text-gray-700 text-sm uppercase tracking-wide focus:outline-none focus:bg-white px-1 rounded cursor-text"
-                                onBlur={handleTitleBlur}
-                                onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
-                                onMouseDown={(e) => e.stopPropagation()} // Allow clicking text without dragging
-                            >
-                                {frame.title}
-                            </div>
-
-                            <button 
-                                onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    e.stopPropagation(); // <--- THIS FIXES THE CONFLICT
-                                    onDelete(frame.id); 
-                                }} 
-                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 font-bold ml-2"
-                                onMouseDown={(e) => e.stopPropagation()} // Prevent drag start on button
-                            >
-                                ×
-                            </button>
-                        </div>
-                    </div>
-                </ResizableBox>
+                  {frame.is_collapsed ? '▶' : '▼'}
+                </button>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleTitleBlur}
+                  onMouseDown={(e) => e.stopPropagation()} // Allow clicking input without dragging
+                  className="bg-transparent border-none outline-none font-bold font-mono text-sm w-40 text-white/80 focus:text-white placeholder-white/20"
+                />
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(frame.id); }}
+                className="text-white/30 hover:text-red-400 font-bold px-2"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                ×
+              </button>
             </div>
-        </Draggable>
-    );
+
+            {/* COLLAPSED HINT */}
+            {frame.is_collapsed && (
+                <div className="px-3 py-1 text-xs text-white/40 italic">
+                    {Math.round(frame.width)}px wide container (Collapsed)
+                </div>
+            )}
+
+            {/* BACKGROUND LABEL (Visual Aid when expanded) */}
+            {!frame.is_collapsed && (
+               <div className="absolute bottom-2 right-2 text-white/5 font-black text-4xl pointer-events-none select-none uppercase">
+                   FRAME
+               </div>
+            )}
+          </div>
+        </ResizableBox>
+      </div>
+    </Draggable>
+  );
 };
 
 export default Frame;

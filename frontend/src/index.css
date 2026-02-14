@@ -19,6 +19,38 @@ body {
     color: #6b7280; /* A slightly darker gray for better contrast on yellow */
 }
 
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #242424; /* Fallback */
+  overflow: hidden; /* Prevent native scrollbars, canvas handles panning */
+}
+
+/* --- AXIS 1: Visual States --- */
+
+/* State: Note is being dragged */
+.note-dragging {
+  cursor: grabbing !important;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+  z-index: 9999 !important; /* Lift above everything else */
+}
+
+/* State: Note is in edit mode */
+.note-editing {
+  cursor: text !important;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.6); /* Blue highlight ring */
+  z-index: 50 !important;
+}
+
+/* Prevent text cursor flickering during drag on non-editable areas */
+.no-drag-cursor {
+  user-select: none;
+}
 /* --- Add this for the resize handle --- */
 .react-resizable-handle {
     display: block;
