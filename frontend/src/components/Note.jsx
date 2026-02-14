@@ -15,59 +15,60 @@ const NOTE_COLORS = [
     { hex: '#242424', name: 'Dark', text: 'white' } 
 ];
 
-// RENDERER: Wiki Syntax -> HTML Chips
-// We use a regex that is STRICT for the [[ ]] pattern to avoid breaking other HTML
+// RENDERER: Wiki Syntax -> HTML Spans (Directive 2)
 const parseAndRenderLinks = (htmlContent) => {
     const content = String(htmlContent || "");
     const internalLinkRegex = /\[\[(note|frame):(\d+)\]\]/g;
     return content.replace(internalLinkRegex, (match, type, id) => {
-        const elementId = `${type}-${id}`;
-        return `<a href="#" data-internal-link="${elementId}" class="internal-link bg-blue-100 text-blue-800 px-1 rounded hover:bg-blue-200 cursor-pointer select-none" contenteditable="false">🔗 ${type} ${id}</a>`;
+        // We use a specific class 'note-link' for the Event Shielding directive
+        return `<span class="note-link bg-blue-100 text-blue-800 px-1 rounded hover:bg-blue-200 cursor-pointer select-none border border-blue-300 mx-1" data-type="${type}" data-id="${id}" contenteditable="false">🔗 ${type}:${id}</span>`;
     });
 };
 
-// SERIALIZER: HTML Chips -> Wiki Syntax
-// We ONLY touch the anchor tags we created. We DO NOT touch <b>, <i>, <br>, <div>
+// SERIALIZER: HTML Spans -> Wiki Syntax
 const serializeContent = (htmlContent) => {
-    const linkRegex = /<a [^>]*data-internal-link="(\w+)-(\d+)"[^>]*>.*?<\/a>/g;
+    const linkRegex = /<span [^>]*class="[^"]*note-link[^"]*"[^>]*data-type="(\w+)"[^>]*data-id="(\d+)"[^>]*>.*?<\/span>/g;
     return htmlContent.replace(linkRegex, '[[$1:$2]]');
 };
 
 const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataChange, onNavigate, scale, isDimmed }) => {
     const nodeRef = useRef(null);
     const contentRef = useRef(null);
-    const [contextMenu, setContextMenu] = useState(null);
     const [showCopyFeedback, setShowCopyFeedback] = useState(false);
 
+    // --- ACTIONS ---
     const handleDragStop = (e, data) => {
+        // Prevent updates on tiny accidental shifts
         if (Math.abs(data.x - note.pos_x) > 1 || Math.abs(data.y - note.pos_y) > 1) {
             onNoteUpdate(note.id, { pos_x: data.x, pos_y: data.y });
         }
     };
-    const handleResizeStop = (e, data) => onNoteUpdate(note.id, { width: data.size.width, height: data.size.height });
+
+    const handleResizeStop = (e, data) => {
+        onNoteUpdate(note.id, { width: data.size.width, height: data.size.height });
+    };
 
     const handleBlur = () => {
         if (contentRef.current) {
             const rawHTML = contentRef.current.innerHTML;
-            
-            console.log(`[Note ${note.id} Debug] Raw HTML on Blur:`, rawHTML); // DEBUG
-            
             const cleanContent = serializeContent(rawHTML);
-            
-            console.log(`[Note ${note.id} Debug] Serialized Content:`, cleanContent); // DEBUG
-
             if (cleanContent !== note.content) {
                 onNoteUpdate(note.id, { content: cleanContent });
             }
         }
     };
 
+    // --- DIRECTIVE 3: Event Shielding ---
     const handleContentClick = (e) => {
-        if (e.target.tagName === 'A' && e.target.dataset.internalLink) {
+        // Check if the clicked element is our custom note-link
+        if (e.target.classList.contains('note-link')) {
             e.preventDefault();
-            e.stopPropagation(); 
-            const [type, id] = e.target.dataset.internalLink.split('-');
-            if (onNavigate) onNavigate(type, id);
+            e.stopPropagation(); // CRITICAL: Stop React-Draggable from seeing this click
+            
+            const { type, id } = e.target.dataset;
+            if (onNavigate && type && id) {
+                onNavigate(type, id);
+            }
         }
     };
 
@@ -79,77 +80,101 @@ const Note = ({ note, onNoteUpdate, onNoteDelete, onTagAdd, onTagRemove, onDataC
         setTimeout(() => setShowCopyFeedback(false), 2000);
     };
 
-    const handleContextMenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setContextMenu({ x: e.clientX, y: e.clientY });
+    // --- DIRECTIVE 4: Color Persistence ---
+    const handleColorChange = (hex) => {
+        onNoteUpdate(note.id, { color_hex: hex });
     };
-
-    const changeColor = (hex) => { onNoteUpdate(note.id, { color_hex: hex }); setContextMenu(null); };
-
-    useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        window.addEventListener('click', handleClick);
-        return () => window.removeEventListener('click', handleClick);
-    }, []);
 
     const isDark = note.color_hex === '#242424';
     const textColor = isDark ? 'text-white' : 'text-gray-900';
     const visualClass = isDimmed ? "opacity-30 grayscale pointer-events-none transition-opacity duration-300" : "opacity-100 transition-opacity duration-300";
 
     return (
-        <>
-            <Draggable nodeRef={nodeRef} handle=".drag-handle" onStop={handleDragStop} position={{ x: note.pos_x, y: note.pos_y }} scale={scale} disabled={isDimmed}>
-                <div 
-                    id={`note-${note.id}`} ref={nodeRef} 
-                    className={`absolute z-20 shadow-xl ${visualClass}`} 
-                    style={{ width: note.width, height: note.height }} 
-                    onContextMenu={handleContextMenu}
+        <Draggable 
+            nodeRef={nodeRef} 
+            handle=".drag-handle" 
+            onStop={handleDragStop} 
+            position={{ x: note.pos_x, y: note.pos_y }} 
+            scale={scale} 
+            disabled={isDimmed}
+        >
+            <div 
+                id={`note-${note.id}`} ref={nodeRef} 
+                className={`absolute z-20 shadow-xl ${visualClass}`} 
+                style={{ width: note.width, height: note.height }} 
+            >
+                <ResizableBox 
+                    height={note.height} 
+                    width={note.width} 
+                    onResizeStop={handleResizeStop} 
+                    minConstraints={[200, 150]} 
+                    handle={<span className="react-resizable-handle react-resizable-handle-se" />}
                 >
-                    <ResizableBox height={note.height} width={note.width} onResizeStop={handleResizeStop} minConstraints={[180, 150]} handle={<span className="react-resizable-handle react-resizable-handle-se" />}>
-                        <div className="w-full h-full rounded-lg flex flex-col overflow-hidden ring-1 ring-black ring-opacity-10 transition-colors duration-200" style={{ backgroundColor: note.color_hex || '#fff000' }}>
-                            
-                            {/* TOOLBAR */}
-                            <div className="drag-handle h-7 w-full cursor-move bg-black bg-opacity-5 hover:bg-opacity-10 flex items-center justify-between p-1 transition-colors select-none">
-                                <span className={`text-[10px] font-mono font-bold ml-1 ${isDark ? 'text-white/50' : 'text-black/50'}`}>
-                                    #{note.id}
-                                </span>
+                    <div className="w-full h-full rounded-lg flex flex-col overflow-hidden ring-1 ring-black ring-opacity-10 transition-colors duration-200" style={{ backgroundColor: note.color_hex || '#fff000' }}>
+                        
+                        {/* HEADER / TOOLBAR */}
+                        <div className="drag-handle h-8 w-full cursor-move bg-black/5 hover:bg-black/10 flex items-center justify-between px-2 transition-colors select-none">
+                            <span className={`text-[10px] font-mono font-bold ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+                                #{note.id}
+                            </span>
 
-                                <div className="flex items-center gap-1">
-                                    <button onClick={handleCopyLink} className={`w-5 h-5 flex items-center justify-center font-bold relative ${isDark ? 'text-white/50 hover:text-blue-400' : 'text-black/30 hover:text-blue-600'}`} title="Copy Link Code">
-                                        🔗
-                                        {showCopyFeedback && <span className="absolute -top-6 -right-2 bg-black text-white text-[10px] px-1 rounded whitespace-nowrap z-50">Copied!</span>}
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); onNoteDelete(note.id); }} className={`w-5 h-5 flex items-center justify-center font-bold ${isDark ? 'text-white/50 hover:text-red-400' : 'text-black/30 hover:text-red-600'}`}>×</button>
-                                </div>
+                            {/* DIRECTIVE 4: Color Strip UI */}
+                            <div className="flex items-center gap-1 mx-2" onMouseDown={(e) => e.stopPropagation()}>
+                                {NOTE_COLORS.map(c => (
+                                    <button 
+                                        key={c.hex}
+                                        onClick={(e) => { e.stopPropagation(); handleColorChange(c.hex); }}
+                                        className={`w-3 h-3 rounded-full border border-black/10 hover:scale-125 transition-transform ${note.color_hex === c.hex ? 'ring-2 ring-blue-500' : ''}`}
+                                        style={{ backgroundColor: c.hex }}
+                                        title={c.name}
+                                    />
+                                ))}
                             </div>
 
-                            {/* CONTENT AREA */}
-                            <div 
-                                ref={contentRef} 
-                                contentEditable 
-                                suppressContentEditableWarning 
-                                className={`flex-grow w-full text-lg p-4 focus:outline-none font-sans leading-relaxed ${textColor}`}
-                                onBlur={handleBlur} 
-                                onClick={handleContentClick}
-                                // The key to rendering HTML is this prop. It injects the HTML string.
-                                dangerouslySetInnerHTML={{ __html: parseAndRenderLinks(note.content) }} 
-                            />
-
-                            <TagManager tags={note.tags || []} onAddTag={(t) => onTagAdd("notes", note.id, t)} onRemoveTag={(t) => onTagRemove("notes", note.id, t)} onDataChange={onDataChange} />
+                            {/* CONTROLS */}
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={handleCopyLink} 
+                                    className={`relative w-5 h-5 flex items-center justify-center font-bold ${isDark ? 'text-white/50 hover:text-blue-400' : 'text-black/30 hover:text-blue-600'}`} 
+                                    title="Copy Link Code"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                    🔗
+                                    {showCopyFeedback && <span className="absolute -top-8 -right-2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">Copied!</span>}
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onNoteDelete(note.id); }} 
+                                    className={`w-5 h-5 flex items-center justify-center font-bold ${isDark ? 'text-white/50 hover:text-red-400' : 'text-black/30 hover:text-red-600'}`}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                    ×
+                                </button>
+                            </div>
                         </div>
-                    </ResizableBox>
-                </div>
-            </Draggable>
 
-            {contextMenu && (
-                <div className="fixed z-[9999] bg-white rounded shadow-xl border border-gray-200 p-2 grid grid-cols-4 gap-2 w-32 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
-                    {NOTE_COLORS.map(c => (
-                        <button key={c.hex} onClick={() => changeColor(c.hex)} className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400" style={{ backgroundColor: c.hex }} title={c.name} />
-                    ))}
-                </div>
-            )}
-        </>
+                        {/* CONTENT AREA */}
+                        <div 
+                            ref={contentRef} 
+                            contentEditable 
+                            suppressContentEditableWarning 
+                            className={`flex-grow w-full text-lg p-4 focus:outline-none font-sans leading-relaxed ${textColor} overflow-auto no-drag-cursor`}
+                            style={{ cursor: 'text' }}
+                            onBlur={handleBlur} 
+                            onClick={handleContentClick} // Event Shielding Here
+                            dangerouslySetInnerHTML={{ __html: parseAndRenderLinks(note.content) }} 
+                        />
+
+                        <TagManager 
+                            tags={note.tags || []} 
+                            onAddTag={(t) => onTagAdd("notes", note.id, t)} 
+                            onRemoveTag={(t) => onTagRemove("notes", note.id, t)} 
+                            onDataChange={onDataChange} 
+                        />
+                    </div>
+                </ResizableBox>
+            </div>
+        </Draggable>
     );
 };
+
 export default Note;
