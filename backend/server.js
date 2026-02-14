@@ -67,6 +67,12 @@ const MIGRATIONS = [
         up: `
             ALTER TABLE tasks ADD COLUMN color_hex TEXT DEFAULT '#1f2937';
         `
+    },
+    {
+        version: 4,
+        up: `
+            ALTER TABLE time_logs ADD COLUMN manual_note TEXT;
+        `
     }
 ];
 
@@ -93,6 +99,9 @@ const runMigrations = () => {
                     } else if (migration.version === 3) {
                         const cols = db.prepare("PRAGMA table_info(tasks)").all();
                         if (!cols.some(c => c.name === 'color_hex')) db.exec(migration.up);
+                    } else if (migration.version === 4) {
+                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
+                        if (!cols.some(c => c.name === 'manual_note')) db.exec(migration.up);
                     } else {
                         db.exec(migration.up);
                     }
@@ -178,8 +187,6 @@ app.get("/api/search", (req, res) => {
         const query = req.query.q;
         if (!query) return res.status(200).json({ noteIds: [], frameIds: [] });
         
-        // Use REGEXP for power users, fallback to LIKE logic handled by the custom function if simple text
-        // The custom function handles the regex logic.
         const noteIds = db
             .prepare(`SELECT id FROM notes WHERE content REGEXP ?`)
             .all(query)
@@ -192,7 +199,6 @@ app.get("/api/search", (req, res) => {
             
         res.status(200).json({ noteIds, frameIds });
     } catch (error) {
-        // Fallback for invalid regex syntax to normal substring search
         try {
              const fallbackQuery = `%${query}%`;
              const noteIds = db.prepare(`SELECT id FROM notes WHERE content LIKE ?`).all(fallbackQuery).map(r => r.id);
@@ -203,20 +209,16 @@ app.get("/api/search", (req, res) => {
         }
     }
 });
-// --- REPLACE THE EXISTING app.put("/api/notes/:id") WITH THIS ROBUST VERSION ---
+
 app.put("/api/notes/:id", (req, res) => {
   try {
       const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
       
-      // Safety Check: Ensure note exists before trying to read it
       const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
       if (!existing) {
-          return res.status(404).json({ error: "Note not found (might have been deleted)" });
+          return res.status(404).json({ error: "Note not found" });
       }
 
-      // If frame_id is explicitly undefined, keep existing. If null/number, use it.
-      // If we are moving (pos_x changed), we might be auto-updating frame_id.
-      // If frame_id is undefined in body, use existing.frame_id
       const finalFrameId = frame_id === undefined ? existing.frame_id : frame_id;
 
       const stmt = db.prepare(`
@@ -358,43 +360,80 @@ app.post("/api/tasks", (req, res) => {
         res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
+
 app.put("/api/tasks/:id", (req, res) => {
     try {
         const { color_hex, title } = req.body;
-        // Allow updating color and title
         db.prepare("UPDATE tasks SET color_hex = COALESCE(?, color_hex), title = COALESCE(?, title) WHERE id = ?")
           .run(color_hex, title, req.params.id);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// DELETE Task: Transactional to clear logs
+app.delete("/api/tasks/:id", (req, res) => {
+    try {
+        const deleteTransaction = db.transaction((id) => {
+            db.prepare("DELETE FROM time_logs WHERE task_id = ?").run(id);
+            db.prepare("DELETE FROM task_tags WHERE task_id = ?").run(id);
+            db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+        });
+        deleteTransaction(req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// START Task Session: Atomic Check
 app.post("/api/tasks/:id/start", (req, res) => {
     try {
-        const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(req.params.id, Date.now());
-        res.json({ logId: info.lastInsertRowid });
+        const { id } = req.params;
+        const now = new Date().toISOString();
+
+        // Atomic check: Is there already a running session for this task?
+        const running = db.prepare("SELECT id FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(id);
+        
+        if (running) {
+            return res.status(409).json({ error: "Session already running for this task." });
+        }
+
+        const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(id, now);
+        res.json({ logId: info.lastInsertRowid, start_time: now });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// STOP Task Session: Duration Calculation & ISO Updates
 app.post("/api/tasks/:id/stop", (req, res) => {
-    const { rating, notes } = req.body; 
-    const now = Date.now();
-    const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
-    
-    if(log) {
-        db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ? WHERE id = ?")
-          .run(now, rating || 0, notes || "", log.id);
+    try {
+        const { rating, notes, manual_note } = req.body; 
+        const nowStr = new Date().toISOString();
+        const now = new Date(nowStr).getTime();
         
-        const duration = now - log.start_time;
-        db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(duration, req.params.id);
-        res.json({ success: true, duration });
-    } else {
-        res.status(400).json({ error: "No running timer" });
-    }
+        const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
+        
+        if(log) {
+            // Handle start_time being potentially INT (legacy) or String (new)
+            const startTimeMs = new Date(log.start_time).getTime();
+            const durationMs = now - startTimeMs;
+            const durationSec = durationMs / 1000;
+
+            db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ?, manual_note = ? WHERE id = ?")
+              .run(nowStr, rating || 0, notes || "", manual_note || "", log.id);
+            
+            // Update total accumulated time for the task
+            db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?")
+              .run(durationMs, req.params.id);
+              
+            res.json({ success: true, duration: durationSec, end_time: nowStr });
+        } else {
+            res.status(400).json({ error: "No running timer" });
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
-// --- ADD THIS NEW ROUTE FOR TASK HISTORY ---
+
 app.get("/api/history", (req, res) => {
     try {
         const logs = db.prepare(`
-            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, t.title as task_title, t.color_hex 
+            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, l.manual_note, t.title as task_title, t.color_hex 
             FROM time_logs l 
             JOIN tasks t ON l.task_id = t.id 
             WHERE l.end_time IS NOT NULL 
