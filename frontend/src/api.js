@@ -34,7 +34,12 @@ export const getTasks = () => apiFetch('/all'); // Expects { tasks: [] }
 export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
 
 // Actions
-export const toggleTask = (id, action) => apiFetch(`/tasks/${id}/${action}`, { method: 'POST' }); // action: 'start' | 'stop'
+// Updated toggleTask to accept body (for manual_note on stop)
+export const toggleTask = (id, action, body = {}) => 
+    apiFetch(`/tasks/${id}/${action}`, { 
+        method: 'POST', 
+        body: JSON.stringify(body) 
+    });
 export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }); 
 export const terminateTask = (id) => updateTask(id, { is_done: 1 }); // Soft Delete
 export const reviveTask = (id) => updateTask(id, { is_done: 0 }); // Undo Soft Delete
