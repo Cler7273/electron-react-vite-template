@@ -2,42 +2,21 @@
 const API_URL = 'http://localhost:4000/api';
 let SECRET_TOKEN = null;
 
-/*export async function initializeApi() {
-  // Check if nativeAPI exists (it might not if preload failed)
-  if (!window.nativeAPI) {
-    console.error("CRITICAL: window.nativeAPI is undefined. Preload script failed.");
-    return;
-  }
-  
-  if (!SECRET_TOKEN) {
-    try {
-      SECRET_TOKEN = await window.nativeAPI.getSecretToken();
-      console.log("API Initialized with Token");
-    } catch (e) {
-      console.error("Failed to get secret token:", e);
-    }
-  }
-}*/
-
 export async function initializeApi() {
-  // Ensure we look for nativeAPI, not electronAPI
   if (window.nativeAPI) {
     SECRET_TOKEN = await window.nativeAPI.getSecretToken();
   } else {
-    console.error("nativeAPI not found. Preload failed?");
+    console.warn("nativeAPI not found. Running in browser mode or preload failed.");
   }
 }
 
 async function apiFetch(endpoint, options = {}) {
-  if (!SECRET_TOKEN) {
-    // Attempt to init if missing (e.g., hot reload)
-    await initializeApi(); 
-    if(!SECRET_TOKEN) throw new Error('API is not initialized. Token missing.');
-  }
-
+  if (!SECRET_TOKEN) await initializeApi();
+  
+  // Fallback for development if token is still missing
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${SECRET_TOKEN}`,
+    ...(SECRET_TOKEN ? { 'Authorization': `Bearer ${SECRET_TOKEN}` } : {}),
     ...options.headers,
   };
 
@@ -50,24 +29,26 @@ async function apiFetch(endpoint, options = {}) {
   return response.json();
 }
 
-// Exports
-export const getKeys = () => apiFetch('/keys');
-export const saveKey = (keyData) => apiFetch('/keys', { method: 'POST', body: JSON.stringify(keyData) });
-export const deleteKey = (keyId) => apiFetch(`/keys/${keyId}`, { method: 'DELETE' });
-export const getPeers = () => apiFetch('/peers');
-export const addPeer = (peerName, seedFilePath) => apiFetch('/peers', { method: 'POST', body: JSON.stringify({ peerName, seedFilePath }) });
+// --- TASKS CORE ---
+export const getTasks = () => apiFetch('/all'); // Expects { tasks: [] }
+export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
 
-export async function encryptFile(filePath, keyConfig, intensity) {
-  const savePath = await window.nativeAPI.showSaveDialog({ defaultPath: `${filePath}.nasm` });
-  if (!savePath) return { success: false, error: 'User cancelled save.' };
-  return apiFetch('/encrypt', { method: 'POST', body: JSON.stringify({ filePath, keyConfig, intensity, savePath }) });
-}
+// Actions
+export const toggleTask = (id, action) => apiFetch(`/tasks/${id}/${action}`, { method: 'POST' }); // action: 'start' | 'stop'
+export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }); 
+export const terminateTask = (id) => updateTask(id, { is_done: 1 }); // Soft Delete
+export const reviveTask = (id) => updateTask(id, { is_done: 0 }); // Undo Soft Delete
+export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' }); // Hard Delete
 
-export async function decryptFile(filePath, keyConfig) {
-  const originalName = filePath.endsWith('.nasm') ? filePath.slice(0, -5) : `${filePath}.decrypted`;
-  const savePath = await window.nativeAPI.showSaveDialog({ defaultPath: originalName });
-  if (!savePath) return { success: false, error: 'User cancelled save.' };
-  return apiFetch('/decrypt', { method: 'POST', body: JSON.stringify({ filePath, keyConfig, savePath }) });
-}
+// --- HISTORY & LOGS ---
+export const getHistory = () => apiFetch('/history');
+// Query specific range for Calendar
+export const getLogsByRange = (startStr, endStr) => apiFetch(`/tasks/logs?view=range&start=${startStr}&end=${endStr}`);
 
-export const selectFile = () => window.nativeAPI.selectFile();
+// --- TAGS & SYSTEM ---
+export const getTags = () => apiFetch('/tags');
+export const addTagToTask = (taskId, tagName) => apiFetch(`/tags/tasks/${taskId}`, { method: 'POST', body: JSON.stringify({ name: tagName }) });
+export const removeTagFromTask = (taskId, tagName) => apiFetch(`/tasks/${taskId}/tags/${tagName}`, { method: 'DELETE' });
+
+// --- UTILS ---
+export const selectFile = () => window.nativeAPI ? window.nativeAPI.selectFile() : null;

@@ -1,0 +1,75 @@
+/* frontend/src/styles/calendar.css */
+
+.calendar-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #111;
+  color: #e5e7eb;
+}
+
+/* --- Month Grid --- */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #374151; /* Border color between cells */
+  border: 1px solid #374151;
+}
+
+.day-cell {
+  background-color: #1f2937;
+  min-height: 80px;
+  position: relative;
+  transition: background-color 0.2s;
+  padding: 4px;
+}
+
+.day-cell:hover {
+  background-color: #2a3546;
+}
+
+.day-cell.inactive {
+  background-color: #111827;
+  opacity: 0.5;
+}
+
+/* --- Day View (Time Blocking) --- */
+.day-view-container {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  background: repeating-linear-gradient(
+    0deg,
+    #1f2937 0px,
+    #1f2937 1px,
+    transparent 1px,
+    transparent 60px
+  );
+  background-size: 100% 60px; /* One hour slots */
+}
+
+.time-slot-label {
+  position: absolute;
+  left: 4px;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.task-block {
+  position: absolute;
+  left: 50px;
+  right: 10px;
+  border-radius: 4px;
+  padding: 4px;
+  font-size: 11px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.task-block:hover {
+  transform: scale(1.01);
+  z-index: 10;
+}

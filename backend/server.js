@@ -30,6 +30,7 @@ app.use((req, res, next) => {
 });
 
 const db = new Database("cognicanvas.db");
+
 // --- NEW: Register Regex Function ---
 db.function('regexp', (pattern, str) => {
     try {
@@ -73,11 +74,16 @@ const MIGRATIONS = [
         up: `
             ALTER TABLE time_logs ADD COLUMN manual_note TEXT;
         `
+    },
+    {
+        version: 5,
+        up: `
+            UPDATE tasks SET is_done = 0 WHERE is_done IS NULL;
+        `
     }
 ];
 
 const runMigrations = () => {
-    // 1. Initialize Version Table
     db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER DEFAULT 0)`);
     const result = db.prepare("SELECT version FROM schema_version").get();
     let currentVersion = result ? result.version : 0;
@@ -86,27 +92,22 @@ const runMigrations = () => {
 
     console.log(`[DB] Current Schema Version: ${currentVersion}`);
 
-    // 2. Apply Missing Migrations
     db.transaction(() => {
         for (const migration of MIGRATIONS) {
             if (migration.version > currentVersion) {
                 console.log(`[DB] Applying migration v${migration.version}...`);
                 try {
-                    // Check if columns exist before altering (defensive coding for dev envs)
-                    if (migration.version === 2) {
-                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
-                        if (!cols.some(c => c.name === 'rating')) db.exec(migration.up);
-                    } else if (migration.version === 3) {
-                        const cols = db.prepare("PRAGMA table_info(tasks)").all();
-                        if (!cols.some(c => c.name === 'color_hex')) db.exec(migration.up);
-                    } else if (migration.version === 4) {
-                        const cols = db.prepare("PRAGMA table_info(time_logs)").all();
-                        if (!cols.some(c => c.name === 'manual_note')) db.exec(migration.up);
-                    } else {
+                    // Defensive column check logic
+                    const tableInfoTimeLogs = db.prepare("PRAGMA table_info(time_logs)").all();
+                    const tableInfoTasks = db.prepare("PRAGMA table_info(tasks)").all();
+                    
+                    if (migration.version === 2 && tableInfoTimeLogs.some(c => c.name === 'rating')) { /* skip */ }
+                    else if (migration.version === 3 && tableInfoTasks.some(c => c.name === 'color_hex')) { /* skip */ }
+                    else if (migration.version === 4 && tableInfoTimeLogs.some(c => c.name === 'manual_note')) { /* skip */ }
+                    else {
                         db.exec(migration.up);
                     }
                 } catch (e) {
-                    // Ignore "duplicate column" errors if manual hotfixes were applied previously
                     if (!e.message.includes('duplicate column')) throw e;
                 }
                 currentVersion = migration.version;
@@ -182,6 +183,7 @@ app.post("/api/notes", (req, res) => {
   const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
   res.status(201).json({ id: info.lastInsertRowid, ...req.body, tags: [] });
 });
+
 app.get("/api/search", (req, res) => {
     try {
         const query = req.query.q;
@@ -213,14 +215,10 @@ app.get("/api/search", (req, res) => {
 app.put("/api/notes/:id", (req, res) => {
   try {
       const { content, pos_x, pos_y, width, height, color_hex, frame_id } = req.body;
-      
       const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
-      if (!existing) {
-          return res.status(404).json({ error: "Note not found" });
-      }
+      if (!existing) return res.status(404).json({ error: "Note not found" });
 
       const finalFrameId = frame_id === undefined ? existing.frame_id : frame_id;
-
       const stmt = db.prepare(`
         UPDATE notes SET 
         content = COALESCE(?, content), 
@@ -235,10 +233,10 @@ app.put("/api/notes/:id", (req, res) => {
       stmt.run(content, pos_x, pos_y, width, height, color_hex, finalFrameId, req.params.id);
       res.json({ success: true });
   } catch (error) {
-      console.error("Update Note Error:", error);
       res.status(500).json({ error: error.message });
   }
 });
+
 app.delete("/api/notes/:id", (req, res) => {
   db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
   res.json({ success: true });
@@ -354,23 +352,36 @@ app.delete("/api/frames/:id", (req, res) => {
 // --- TASKS ---
 app.post("/api/tasks", (req, res) => {
     try {
-        const { title } = req.body;
-        const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms) VALUES (?, 0, ?, 0)");
-        const info = stmt.run(title, Date.now());
-        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0 });
+        const { title, color_hex } = req.body;
+        const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms, color_hex) VALUES (?, 0, ?, 0, ?)");
+        const info = stmt.run(title, Date.now(), color_hex || '#1f2937');
+        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0, color_hex: color_hex || '#1f2937' });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// EXPANDED: Update task properties including termination (is_done)
 app.put("/api/tasks/:id", (req, res) => {
     try {
-        const { color_hex, title } = req.body;
-        db.prepare("UPDATE tasks SET color_hex = COALESCE(?, color_hex), title = COALESCE(?, title) WHERE id = ?")
-          .run(color_hex, title, req.params.id);
+        const { color_hex, title, is_done } = req.body;
+        
+        // Use a dynamic update to handle partial bodies correctly
+        const updates = [];
+        const params = [];
+
+        if (color_hex !== undefined) { updates.push("color_hex = ?"); params.push(color_hex); }
+        if (title !== undefined) { updates.push("title = ?"); params.push(title); }
+        if (is_done !== undefined) { updates.push("is_done = ?"); params.push(is_done ? 1 : 0); }
+
+        if (updates.length === 0) return res.json({ success: true, message: "No fields to update" });
+
+        params.push(req.params.id);
+        db.prepare(`UPDATE tasks SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+        
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE Task: Transactional to clear logs
+// DELETE Task: Transactional to clear logs and tags
 app.delete("/api/tasks/:id", (req, res) => {
     try {
         const deleteTransaction = db.transaction((id) => {
@@ -383,25 +394,19 @@ app.delete("/api/tasks/:id", (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// START Task Session: Atomic Check
 app.post("/api/tasks/:id/start", (req, res) => {
     try {
         const { id } = req.params;
         const now = new Date().toISOString();
-
-        // Atomic check: Is there already a running session for this task?
         const running = db.prepare("SELECT id FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(id);
         
-        if (running) {
-            return res.status(409).json({ error: "Session already running for this task." });
-        }
+        if (running) return res.status(409).json({ error: "Session already running for this task." });
 
         const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(id, now);
         res.json({ logId: info.lastInsertRowid, start_time: now });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// STOP Task Session: Duration Calculation & ISO Updates
 app.post("/api/tasks/:id/stop", (req, res) => {
     try {
         const { rating, notes, manual_note } = req.body; 
@@ -411,7 +416,6 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
         
         if(log) {
-            // Handle start_time being potentially INT (legacy) or String (new)
             const startTimeMs = new Date(log.start_time).getTime();
             const durationMs = now - startTimeMs;
             const durationSec = durationMs / 1000;
@@ -419,7 +423,6 @@ app.post("/api/tasks/:id/stop", (req, res) => {
             db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ?, manual_note = ? WHERE id = ?")
               .run(nowStr, rating || 0, notes || "", manual_note || "", log.id);
             
-            // Update total accumulated time for the task
             db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?")
               .run(durationMs, req.params.id);
               
@@ -430,17 +433,40 @@ app.post("/api/tasks/:id/stop", (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// EXPANDED: Range Filtering for Efficiency Grid (Calendar)
 app.get("/api/history", (req, res) => {
     try {
-        const logs = db.prepare(`
-            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, l.manual_note, t.title as task_title, t.color_hex 
+        const { start, end, view } = req.query;
+        let query = `
+            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, l.manual_note, 
+                   t.title as task_title, t.color_hex, t.id as task_id
             FROM time_logs l 
             JOIN tasks t ON l.task_id = t.id 
-            WHERE l.end_time IS NOT NULL 
-            ORDER BY l.start_time DESC 
-            LIMIT 50
-        `).all();
-        res.json(logs);
+            WHERE l.end_time IS NOT NULL
+        `;
+        const params = [];
+
+        if (start && end) {
+            query += ` AND l.start_time >= ? AND l.start_time <= ?`;
+            params.push(start, end);
+        }
+
+        query += ` ORDER BY l.start_time DESC`;
+
+        // Only limit if no specific range is requested (for general history tab)
+        if (!start && !end) {
+            query += ` LIMIT 100`;
+        }
+
+        const logs = db.prepare(query).all(...params);
+
+        // Fetch tags for each log's task to support Sidebar Distribution (Pie Chart)
+        const enrichedLogs = logs.map(log => ({
+            ...log,
+            tags: getTagsFor("task", log.task_id)
+        }));
+
+        res.json(enrichedLogs);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

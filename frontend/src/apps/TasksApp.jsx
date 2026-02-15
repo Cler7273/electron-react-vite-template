@@ -1,407 +1,361 @@
 // frontend/src/apps/TasksApp.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import * as API from '../api';
+import '../styles/calendar.css';
 
-const TasksApp = () => {
-  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
-  const [tasks, setTasks] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-
-  // --- HELPERS ---
-  const formatDurationHMS = (ms) => {
-      if (!ms) return "0s";
-      const seconds = Math.floor((ms / 1000) % 60);
-      const minutes = Math.floor((ms / (1000 * 60)) % 60);
-      const hours = Math.floor((ms / (1000 * 60 * 60)));
-
-      const parts = [];
-      if (hours > 0) parts.push(`${hours}h`);
-      if (minutes > 0) parts.push(`${minutes}m`);
-      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-      
-      return parts.join(' ');
-  };
-
-  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-
-  // --- API FETCHING ---
-  const fetchTasks = async () => {
-    try {
-      const token = await window.nativeAPI.getSecretToken();
-      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
-      setTasks(data.tasks || []);
-    } catch (e) { console.error("Fetch tasks failed", e); }
-  };
-
-  const fetchHistory = async () => {
-      try {
-        const token = await window.nativeAPI.getSecretToken();
-        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        setHistory(data || []);
-      } catch (e) { console.error("Fetch history failed", e); }
-  };
-
-  // --- LIFECYCLE ---
-  useEffect(() => {
-    // Initial Load
-    fetchTasks();
-    fetchHistory();
-
-    // Listen for widget updates (start/stop on canvas) to refresh this list
-    const handleRefresh = () => {
-        fetchTasks();
-        if (tab !== 'active') fetchHistory();
-    };
-    window.addEventListener('cognicanvas:data-updated', handleRefresh);
-    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
-  }, [tab]);
-
-  // --- HANDLERS ---
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-
-    const token = await window.nativeAPI.getSecretToken();
-    await fetch('http://localhost:4000/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ title: newTaskTitle })
-    });
-    setNewTaskTitle("");
-    fetchTasks();
-    // Notify Canvas to spawn widget
-    window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
-  };
-
-  // --- RENDERERS ---
-  const renderActive = () => (
-    <>
-        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
-            <input 
-                type="text" 
-                className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="New Task Name..." 
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                autoFocus
-            />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">
-                Add
-            </button>
-        </form>
-
-        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-            {tasks.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No active tasks.</p>}
-            {tasks.map(task => (
-                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
-                    <div>
-                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">
-                            {task.title}
-                            {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
-                        </div>
-                        <div className="text-xs text-gray-400 font-mono mt-1">
-                            Total: {formatDurationHMS(task.total_time_ms)}
-                        </div>
-                    </div>
-                    {task.is_running && <span className="text-[10px] font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900">RUNNING</span>}
-                </div>
-            ))}
-        </div>
-    </>
-  );
-
-  const renderHistory = () => (
-      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-          {history.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No session history found.</p>}
-          {history.map(log => (
-              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
-                  <div className="flex justify-between items-start">
-                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
-                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-400 font-mono">
-                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
-                      </div>
-                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
-                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
-                      </div>
-                  </div>
-              </div>
-          ))}
-      </div>
-  );
-
-  const renderCalendar = () => {
-      // Logic: Generate last 28 days
-      const days = [];
-      const today = new Date();
-      // Reset to start of day for accurate comparison
-      today.setHours(0,0,0,0);
-
-      for(let i=27; i>=0; i--) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const dateStr = d.toLocaleDateString();
-          
-          // Aggregate Logs
-          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
-          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
-          
-          let colorClass = 'bg-gray-800 border-gray-700';
-          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
-          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
-          if(totalMs > 14400000) colorClass = 'bg-green-500 border-green-400'; // > 4h
-
-          days.push(
-              <div key={i} className={`h-8 w-8 rounded ${colorClass} border flex items-center justify-center text-[10px] relative group cursor-help transition-all hover:scale-110`}>
-                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
-                  
-                  {/* Tooltip */}
-                  {totalMs > 0 && (
-                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap hidden group-hover:block z-50 border border-gray-600 shadow-xl">
-                          {formatDurationHMS(totalMs)}
-                      </div>
-                  )}
-              </div>
-          );
-      }
-
-      return (
-          <div className="p-2">
-              <div className="flex justify-between items-baseline mb-3">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
-                  <span className="text-[10px] text-gray-500">Last 28 Days</span>
-              </div>
-              <div className="grid grid-cols-7 gap-2">
-                  {days}
-              </div>
-              <div className="mt-4 flex gap-2 justify-center text-[10px] text-gray-500">
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-gray-800 rounded"></div> 0m</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-900/60 rounded"></div> &lt;1h</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-700 rounded"></div> &gt;1h</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded"></div> &gt;4h</span>
-              </div>
-          </div>
-      );
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
-      {/* Custom Tab Bar */}
-      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
-          {['active', 'history', 'calendar'].map(t => (
-            <button 
-                key={t}
-                onClick={() => setTab(t)} 
-                className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all
-                    ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
-                `}
+// --- SUB-COMPONENT: CONTEXT MENU ---
+const ContextMenu = ({ x, y, task, onClose, onAction }) => {
+    if (!task) return null;
+    return (
+        <>
+            <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+            <div 
+                className="fixed z-[9999] bg-[#222] border border-gray-600 rounded-md shadow-2xl py-1 w-48 text-gray-200 text-sm animate-in fade-in zoom-in-95 duration-75"
+                style={{ top: y, left: x }}
             >
-                {t}
-            </button>
-          ))}
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 min-h-0">
-        {tab === 'active' && renderActive()}
-        {tab === 'history' && renderHistory()}
-        {tab === 'calendar' && renderCalendar()}
-      </div>
-    </div>
-  );
+                <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase border-b border-gray-700 mb-1">{task.title}</div>
+                <button onClick={() => onAction('toggle')} className="w-full text-left px-3 py-2 hover:bg-blue-600 flex gap-2">
+                    <span>{task.is_running ? '⏸ Stop' : '▶ Start'}</span>
+                </button>
+                <button onClick={() => onAction('properties')} className="w-full text-left px-3 py-2 hover:bg-gray-700 flex gap-2">
+                    <span>📊 History & Props</span>
+                </button>
+                <button onClick={() => onAction('terminate')} className="w-full text-left px-3 py-2 hover:bg-orange-600 flex gap-2 border-t border-gray-700 mt-1">
+                    <span>🏁 Terminate</span>
+                </button>
+                <button onClick={() => onAction('delete')} className="w-full text-left px-3 py-2 hover:bg-red-700 text-red-300 flex gap-2">
+                    <span>🗑 Hard Delete</span>
+                </button>
+            </div>
+        </>
+    );
 };
 
-export default TasksApp;
-
-/**COMPLEMENTARY CODE FOR FUTUR UNIFICATION. BUT IT WAS SOMEWHY INCOMPLETE SO ADDED HERE TO NOT LOOSE ANYTHING
- * 
- * import React, { useState, useEffect } from 'react';
+// --- HELPER: FORMAT DURATION ---
+const formatDuration = (ms) => {
+    if (!ms) return "0m";
+    const hrs = Math.floor(ms / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m`;
+};
 
 const TasksApp = () => {
-  const [tab, setTab] = useState('active'); // 'active' | 'history' | 'calendar'
-  const [tasks, setTasks] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  // NEW: State for selected day details
-  const [selectedDate, setSelectedDate] = useState(null);
+    // --- STATE ---
+    const [view, setView] = useState('dashboard'); // 'dashboard', 'history', 'calendar'
+    const [calendarMode, setCalendarMode] = useState('month'); // 'month', 'day'
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    
+    const [tasks, setTasks] = useState([]);
+    const [logs, setLogs] = useState([]);
+    const [contextMenu, setContextMenu] = useState(null); // { x, y, task }
+    const [newTask, setNewTask] = useState("");
 
-  const formatDurationHMS = (ms) => {
-      if (!ms) return "0s";
-      const seconds = Math.floor((ms / 1000) % 60);
-      const minutes = Math.floor((ms / (1000 * 60)) % 60);
-      const hours = Math.floor((ms / (1000 * 60 * 60)));
-      const parts = [];
-      if (hours > 0) parts.push(`${hours}h`);
-      if (minutes > 0) parts.push(`${minutes}m`);
-      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-      return parts.join(' ');
-  };
+    // --- DATA FETCHING ---
+    const loadData = async () => {
+        try {
+            const tData = await API.getTasks();
+            const lData = await API.getHistory();
+            setTasks(tData.tasks || []);
+            setLogs(lData || []);
+        } catch (e) {
+            console.error("Failed to load task data", e);
+        }
+    };
 
-  const formatDate = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const formatTime = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    useEffect(() => {
+        loadData();
+        const interval = setInterval(loadData, 30000); // Poll every 30s
+        const handleRemote = () => loadData();
+        window.addEventListener('cognicanvas:data-updated', handleRemote);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('cognicanvas:data-updated', handleRemote);
+        };
+    }, []);
 
-  const fetchTasks = async () => {
-    try {
-      const token = await window.nativeAPI.getSecretToken();
-      const res = await fetch('http://localhost:4000/api/all', { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
-      setTasks(data.tasks || []);
-    } catch (e) { console.error("Fetch tasks failed", e); }
-  };
+    // --- ACTIONS ---
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!newTask.trim()) return;
+        await API.createTask(newTask);
+        setNewTask("");
+        loadData();
+    };
 
-  const fetchHistory = async () => {
-      try {
-        const token = await window.nativeAPI.getSecretToken();
-        const res = await fetch('http://localhost:4000/api/history', { headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        setHistory(data || []);
-      } catch (e) { console.error("Fetch history failed", e); }
-  };
+    const handleMenuAction = async (action) => {
+        const { task } = contextMenu;
+        setContextMenu(null); // Close menu
+        
+        switch (action) {
+            case 'toggle':
+                await API.toggleTask(task.id, task.is_running ? 'stop' : 'start');
+                break;
+            case 'terminate':
+                if (confirm(`Retire "${task.title}" to archives?`)) await API.terminateTask(task.id);
+                break;
+            case 'delete':
+                if (confirm(`PERMANENTLY DELETE "${task.title}" and all its history?`)) await API.deleteTask(task.id);
+                break;
+            case 'properties':
+                setView('history');
+                // Could implement a filter here later
+                break;
+            default: break;
+        }
+        loadData();
+    };
 
-  useEffect(() => {
-    fetchTasks();
-    fetchHistory();
-    const handleRefresh = () => { fetchTasks(); if (tab !== 'active') fetchHistory(); };
-    window.addEventListener('cognicanvas:data-updated', handleRefresh);
-    return () => window.removeEventListener('cognicanvas:data-updated', handleRefresh);
-  }, [tab]);
+    const goToDay = (date) => {
+        setSelectedDate(date);
+        setCalendarMode('day');
+        setView('calendar');
+    };
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-    const token = await window.nativeAPI.getSecretToken();
-    await fetch('http://localhost:4000/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ title: newTaskTitle }) });
-    setNewTaskTitle("");
-    fetchTasks();
-    window.dispatchEvent(new CustomEvent('cognicanvas:data-updated'));
-  };
+    // --- RENDERERS ---
 
-  // --- RENDERERS ---
-  const renderActive = () => (
-    <>
-        <form onSubmit={handleCreate} className="flex gap-2 mb-4">
-            <input type="text" className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="New Task Name..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} autoFocus />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-md transition-transform active:scale-95">Add</button>
-        </form>
-        <div className="space-y-2 overflow-y-auto pr-2 h-[300px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-            {tasks.map(task => (
-                <div key={task.id} className="bg-gray-800/50 border border-gray-700 rounded p-3 flex justify-between items-center hover:bg-gray-800 transition-colors">
-                    <div>
-                        <div className="font-bold text-gray-200 text-sm flex items-center gap-2">{task.title} {task.is_running && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}</div>
-                        <div className="text-xs text-gray-400 font-mono mt-1">Total: {formatDurationHMS(task.total_time_ms)}</div>
+    const renderDashboard = () => {
+        const activeTasks = tasks.filter(t => t.is_done === 0);
+        const terminatedTasks = tasks.filter(t => t.is_done === 1);
+
+        const TaskCard = ({ task }) => (
+            <div 
+                className="bg-gray-800 hover:bg-gray-750 border-l-4 p-3 rounded shadow-sm cursor-context-menu flex justify-between items-center transition-all hover:translate-x-1"
+                style={{ borderLeftColor: task.color_hex || '#3b82f6' }}
+                onClick={(e) => {
+                    // Left click opens context menu in this design as per prompt "Interaction"
+                    setContextMenu({ x: e.clientX, y: e.clientY, task });
+                }}
+            >
+                <div>
+                    <h4 className="font-bold text-gray-200 text-sm">{task.title}</h4>
+                    <span className="text-xs text-gray-500 font-mono">
+                        {formatDuration(task.total_time_ms)} total
+                    </span>
+                </div>
+                {task.is_running && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]" />}
+            </div>
+        );
+
+        return (
+            <div className="flex h-full gap-4 p-2 overflow-hidden">
+                {/* Active Column */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Active Protocols</h3>
+                    <form onSubmit={handleCreate} className="mb-2 flex gap-1">
+                        <input 
+                            value={newTask} 
+                            onChange={e => setNewTask(e.target.value)}
+                            placeholder="Initialize Task..."
+                            className="flex-1 bg-black border border-gray-700 rounded px-2 py-1 text-sm focus:border-blue-500 outline-none"
+                        />
+                        <button className="bg-blue-600 px-3 rounded text-white font-bold text-xs">+</button>
+                    </form>
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                        {activeTasks.map(t => <TaskCard key={t.id} task={t} />)}
+                        {activeTasks.length === 0 && <div className="text-center text-gray-600 italic text-xs mt-10">No active tasks.</div>}
                     </div>
                 </div>
-            ))}
+
+                {/* Terminated Column */}
+                <div className="w-1/3 flex flex-col border-l border-gray-800 pl-4 min-w-0">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Archives</h3>
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin opacity-75">
+                        {terminatedTasks.map(t => <TaskCard key={t.id} task={t} />)}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderHistory = () => (
+        <div className="h-full overflow-y-auto pr-2 scrollbar-thin">
+            <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-[#111] z-10 text-xs text-gray-500 uppercase">
+                    <tr>
+                        <th className="p-2 border-b border-gray-800">Date</th>
+                        <th className="p-2 border-b border-gray-800">Task</th>
+                        <th className="p-2 border-b border-gray-800">Duration</th>
+                        <th className="p-2 border-b border-gray-800">Time</th>
+                    </tr>
+                </thead>
+                <tbody className="text-sm">
+                    {logs.map(log => {
+                        const duration = log.end_time ? log.end_time - log.start_time : 0;
+                        const opacity = Math.min(1, Math.max(0.2, duration / 3600000)); // Darker for longer tasks
+                        const task = tasks.find(t => t.title === log.task_title) || {};
+                        
+                        return (
+                            <tr 
+                                key={log.id} 
+                                className="hover:bg-gray-800 cursor-pointer transition-colors group"
+                                onClick={() => goToDay(new Date(log.start_time))}
+                            >
+                                <td className="p-2 border-b border-gray-800 text-gray-400 font-mono text-xs">
+                                    {new Date(log.start_time).toLocaleDateString()}
+                                </td>
+                                <td className="p-2 border-b border-gray-800 font-bold relative pl-4">
+                                    <div 
+                                        className="absolute left-0 top-2 bottom-2 w-1 rounded-r" 
+                                        style={{ backgroundColor: task.color_hex || '#555' }} 
+                                    />
+                                    {log.task_title}
+                                </td>
+                                <td className="p-2 border-b border-gray-800 font-mono text-blue-300">
+                                    {log.end_time ? formatDuration(duration) : 'Active'}
+                                </td>
+                                <td className="p-2 border-b border-gray-800 text-gray-500 text-xs">
+                                    {new Date(log.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
-    </>
-  );
+    );
 
-  const renderHistoryList = (list) => (
-      <div className="space-y-3 overflow-y-auto pr-2 h-[350px] scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-          {list.length === 0 && <p className="text-gray-500 text-sm italic text-center mt-8">No records found.</p>}
-          {list.map(log => (
-              <div key={log.id} className="bg-gray-800/30 border-l-2 border-blue-500 pl-3 py-2 pr-2 rounded-r hover:bg-gray-800/50 transition-colors">
-                  <div className="flex justify-between items-start">
-                      <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
-                      <span className="text-xs font-mono text-gray-500">{formatDate(log.start_time)}</span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                      <div className="text-xs text-gray-400 font-mono">
-                          {formatTime(log.start_time)} - {log.end_time ? formatTime(log.end_time) : '...'}
-                      </div>
-                      <div className="text-xs font-bold text-blue-300 font-mono bg-blue-900/20 px-1.5 py-0.5 rounded">
-                          {log.end_time ? formatDurationHMS(log.end_time - log.start_time) : 'Active'}
-                      </div>
-                  </div>
-              </div>
-          ))}
-      </div>
-  );
+    const renderCalendar = () => {
+        if (calendarMode === 'day') {
+            // DAY VIEW
+            const dateStr = selectedDate.toLocaleDateString();
+            const dayLogs = logs.filter(l => new Date(l.start_time).toLocaleDateString() === dateStr);
+            
+            return (
+                <div className="h-full flex flex-col calendar-wrapper">
+                    <div className="flex justify-between items-center p-2 bg-gray-900 border-b border-gray-800">
+                        <button onClick={() => setCalendarMode('month')} className="text-xs hover:text-white text-gray-400">← Back to Month</button>
+                        <h2 className="font-bold text-white">{selectedDate.toDateString()}</h2>
+                        <div className="w-10"></div>
+                    </div>
+                    <div className="day-view-container relative">
+                        {/* Time Grid (0-24h) */}
+                        {Array.from({ length: 24 }).map((_, i) => (
+                            <div key={i} className="h-[60px] border-t border-gray-800 w-full" style={{top: `${i * 60}px`}}>
+                                <span className="time-slot-label">{i}:00</span>
+                            </div>
+                        ))}
+                        {/* Blocks */}
+                        {dayLogs.map(log => {
+                            const start = new Date(log.start_time);
+                            const end = log.end_time ? new Date(log.end_time) : new Date(); // If running, assume now
+                            const startMin = start.getHours() * 60 + start.getMinutes();
+                            const durationMin = (end - start) / 60000;
+                            const task = tasks.find(t => t.title === log.task_title);
 
-  const renderCalendar = () => {
-      // Logic: Generate last 28 days
-      const days = [];
-      const today = new Date();
-      today.setHours(0,0,0,0);
+                            return (
+                                <div 
+                                    key={log.id}
+                                    className="task-block"
+                                    style={{
+                                        top: `${startMin}px`, // 1px = 1min
+                                        height: `${Math.max(20, durationMin)}px`,
+                                        backgroundColor: `${task?.color_hex || '#374151'}80`, // Add opacity
+                                        border: `2px solid ${task?.color_hex || '#374151'}`,
+                                    }}
+                                >
+                                    <div className="font-bold truncate">{log.task_title}</div>
+                                    <div className="text-[10px] opacity-75">{formatDuration(end - start)}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
 
-      for(let i=27; i>=0; i--) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const dateStr = d.toLocaleDateString();
-          
-          // Find logs for this specific day
-          const dayLogs = history.filter(h => new Date(h.start_time).toLocaleDateString() === dateStr);
-          const totalMs = dayLogs.reduce((acc, curr) => acc + (curr.end_time ? (curr.end_time - curr.start_time) : 0), 0);
-          
-          let colorClass = 'bg-gray-800 border-gray-700';
-          if(totalMs > 0) colorClass = 'bg-green-900/60 border-green-800';
-          if(totalMs > 3600000) colorClass = 'bg-green-700 border-green-600'; // > 1h
-          
-          const isSelected = selectedDate === dateStr;
+        // MONTH VIEW
+        // Simple logic: Get first day of month, fill grid
+        const year = selectedDate.getFullYear();
+        const month = selectedDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startOffset = firstDay.getDay(); // 0 = Sun
+        
+        const days = [];
+        // Empty slots
+        for(let i=0; i<startOffset; i++) days.push(<div key={`empty-${i}`} className="day-cell inactive" />);
+        // Days
+        for(let d=1; d<=daysInMonth; d++) {
+            const currentDayStr = new Date(year, month, d).toLocaleDateString();
+            const dayLogs = logs.filter(l => new Date(l.start_time).toLocaleDateString() === currentDayStr);
+            const totalMs = dayLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+            
+            days.push(
+                <div 
+                    key={d} 
+                    className="day-cell cursor-pointer flex flex-col"
+                    onClick={() => goToDay(new Date(year, month, d))}
+                >
+                    <span className="text-gray-500 text-xs font-bold">{d}</span>
+                    {totalMs > 0 && (
+                        <div className="mt-auto">
+                            <div className="h-1 bg-green-900 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-green-500" 
+                                    style={{ width: `${Math.min(100, (totalMs / 28800000) * 100)}%` }} // Base on 8h work day
+                                />
+                            </div>
+                            <div className="text-[10px] text-green-400 text-right mt-1">{formatDuration(totalMs)}</div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
-          days.push(
-              <div 
-                key={i} 
-                className={`h-8 w-8 rounded border flex items-center justify-center text-[10px] relative cursor-pointer transition-all hover:scale-110 
-                    ${colorClass} ${isSelected ? 'ring-2 ring-white scale-110 z-10' : ''}`}
-                onClick={() => setSelectedDate(dateStr)}
-              >
-                  <span className="text-gray-300 pointer-events-none">{d.getDate()}</span>
-              </div>
-          );
-      }
+        return (
+            <div className="h-full flex flex-col calendar-wrapper p-2">
+                <div className="flex justify-between items-center mb-4">
+                    <button onClick={() => setSelectedDate(new Date(year, month - 1, 1))} className="px-2 py-1 bg-gray-800 rounded">◀</button>
+                    <h2 className="font-bold text-lg uppercase tracking-widest">
+                        {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h2>
+                    <button onClick={() => setSelectedDate(new Date(year, month + 1, 1))} className="px-2 py-1 bg-gray-800 rounded">▶</button>
+                </div>
+                <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-1">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div className="month-grid flex-1">
+                    {days}
+                </div>
+            </div>
+        );
+    };
 
-      // Filter history for selected date
-      const selectedLogs = selectedDate 
-        ? history.filter(h => new Date(h.start_time).toLocaleDateString() === selectedDate)
-        : [];
+    return (
+        <div className="h-full flex flex-col bg-[#111] text-gray-100 font-sans relative">
+            {/* Tabs */}
+            <nav className="flex bg-black/40 p-1 m-2 rounded-lg gap-1 border border-gray-800">
+                {['dashboard', 'history', 'calendar'].map(t => (
+                    <button
+                        key={t}
+                        onClick={() => setView(t)}
+                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-widest rounded transition-all
+                            ${view === t ? 'bg-gray-700 text-white shadow-md' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
+                        `}
+                    >
+                        {t}
+                    </button>
+                ))}
+            </nav>
 
-      return (
-          <div className="p-2 h-full flex flex-col">
-              <div className="flex justify-between items-baseline mb-3">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Efficiency Grid</h3>
-                  <span className="text-[10px] text-gray-500">Click a day to view details</span>
-              </div>
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                  {days}
-              </div>
-              
-              // Day Details View 
-              <div className="flex-1 min-h-0 border-t border-gray-700 pt-2">
-                  <h4 className="text-xs font-bold text-white mb-2">
-                      {selectedDate ? `Activity for ${selectedDate}` : "Select a day above"}
-                  </h4>
-                  {selectedDate && renderHistoryList(selectedLogs)}
-              </div>
-          </div>
-      );
-  };
+            {/* Content */}
+            <main className="flex-1 min-h-0 relative">
+                {view === 'dashboard' && renderDashboard()}
+                {view === 'history' && renderHistory()}
+                {view === 'calendar' && renderCalendar()}
+            </main>
 
-  return (
-    <div className="h-full flex flex-col bg-[#111] text-gray-100 p-1">
-      <div className="flex mb-4 bg-black/20 p-1 rounded-lg">
-          {['active', 'history', 'calendar'].map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${tab === t ? 'bg-gray-700 text-white shadow' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
-                {t}
-            </button>
-          ))}
-      </div>
-      <div className="flex-1 min-h-0">
-        {tab === 'active' && renderActive()}
-        {tab === 'history' && renderHistoryList(history)}
-        {tab === 'calendar' && renderCalendar()}
-      </div>
-    </div>
-  );
+            {/* Context Menu Portal */}
+            {contextMenu && (
+                <ContextMenu 
+                    {...contextMenu} 
+                    onClose={() => setContextMenu(null)} 
+                    onAction={handleMenuAction}
+                />
+            )}
+        </div>
+    );
 };
 
 export default TasksApp;
- * 
- * 
- * 
- */

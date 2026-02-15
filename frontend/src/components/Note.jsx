@@ -12,7 +12,9 @@ const NOTE_COLORS = [
     { hex: '#c5e1a5', name: 'Green', border: '#7cb342', header: '#aed581' },
     { hex: '#ffcc80', name: 'Orange', border: '#fb8c00', header: '#ffb74d' },
     { hex: '#d1c4e9', name: 'Purple', border: '#7e57c2', header: '#b39ddb' },
-    { hex: '#303030', name: 'Dark', border: '#000000', header: '#424242' } 
+    { hex: '#303030', name: 'Dark', border: '#000000', header: '#424242' } ,
+    { hex: '#242424', name: 'Darker', border: '#000000', header: '#303030' },
+    {hex: '#f83bff', name: 'Hot Pink', border: '#c000c0', header: '#f06292' },
 ];
 
 // HELPER: Wiki-Style Links
