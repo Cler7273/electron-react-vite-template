@@ -176,7 +176,7 @@ function App() {
                         {/* TASKS APP WINDOW */}
                         {openApps.includes("tasks") && (
                             <div className="pointer-events-auto">
-                                <HDWindowFrame title="Task Manager" onClose={() => toggleApp("tasks")} initialPos={{ x: 50, y: 50 }} initialSize={{ width: 500, height: 700 }}>
+                                <HDWindowFrame title="Task Manager" onDelete={() => toggleApp("tasks")} onClose={() => toggleApp("tasks")} initialPos={{ x: 50, y: 50 }} initialSize={{ width: 500, height: 700 }}>
                                     <TasksApp />
                                 </HDWindowFrame>
                             </div>

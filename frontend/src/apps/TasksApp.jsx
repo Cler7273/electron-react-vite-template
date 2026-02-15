@@ -15,7 +15,8 @@ const formatDate = (date) => new Date(date).toLocaleDateString(undefined, { mont
 const formatTime = (date) => new Date(date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 // --- COMPONENT: TASKS APP ---
-const TasksApp = ({ windowAPI }) => {
+const TasksApp = ({ windowAPI , isHeaderOnly }) => {
+    const scrollRef = useRef(null); // Add this at the top of TasksApp
     // --- WIDGET SYNC HELPER ---
     const toggleWidgetVisibility = (taskId) => {
         window.dispatchEvent(new CustomEvent("task:toggle-visibility", { detail: { taskId } }));
@@ -123,6 +124,21 @@ const TasksApp = ({ windowAPI }) => {
         setSelectedDate(date);
         setCalendarMode("day");
         setView("calendar");
+
+        // Calculate vertical scroll position
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const scrollTarget = (hours * 60 + minutes) * zoomLevel;
+
+        // Wait for the view to switch, then scroll
+        setTimeout(() => {
+            if (scrollRef.current) {
+                scrollRef.current.scrollTo({
+                    top: scrollTarget,
+                    behavior: "smooth",
+                });
+            }
+        }, 100);
     };
 
     // NOTE COLORS PRESET
@@ -284,10 +300,8 @@ const TasksApp = ({ windowAPI }) => {
                                         <span className="text-[10px] text-gray-600">{formatTime(log.start_time)}</span>
                                     </div>
                                 </div>
-
-                                
                             </div>
-                            
+
                             {isExpanded && (
                                 <div className="bg-[#050505] border-t border-gray-800 p-4 flex flex-col gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
                                     {/* Data Grid */}
@@ -313,11 +327,11 @@ const TasksApp = ({ windowAPI }) => {
                                             </div>
                                         </div>
                                         <div className="col-span-2 pt-2 border-t border-gray-800/50">
-                                    <div className="flex justify-between text-[9px] text-gray-500 uppercase font-bold">
-                                        <span>Day Start: {new Date(log.start_time).toLocaleDateString()} 00:00:00</span>
-                                        <span>Day End: {new Date(log.start_time).toLocaleDateString()} 23:59:59</span>
-                                    </div>
-                                </div>
+                                            <div className="flex justify-between text-[9px] text-gray-500 uppercase font-bold">
+                                                <span>Day Start: {new Date(log.start_time).toLocaleDateString()} 00:00:00</span>
+                                                <span>Day End: {new Date(log.start_time).toLocaleDateString()} 23:59:59</span>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Note Section & Action */}
@@ -398,7 +412,7 @@ const TasksApp = ({ windowAPI }) => {
                 return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
             });
             const monthTotalMs = monthLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
-            return(
+            return (
                 <div className="h-full flex flex-col bg-[#050505]">
                     <CalendarHeader />
                     <div className="px-4 py-1.5 bg-blue-900/10 border-b border-blue-900/30 flex justify-between items-center">
@@ -444,9 +458,9 @@ const TasksApp = ({ windowAPI }) => {
                                             <div className="text-[9px] text-green-400 font-mono text-right border-t border-gray-800 pt-0.5">{formatDuration(totalMs)}</div>
                                         </div>
                                     )}
-                                    <div className="px-4 py-1 bg-black/40 text-[10px] text-blue-400 font-mono flex justify-between">
-                                        <span>MONTHLY ACCUMULATED:</span>
-                                        <span className="font-bold">{formatDuration(monthTotalMs)}</span>
+                                    <div className="px-1 py-1 bg-black/40 text-[10px] text-blue-400 font-mono flex justify-between">
+                                        <span>Total:{formatDuration(monthTotalMs)}</span>
+                                        <span className="font-bold -left-5"></span>
                                     </div>
                                 </div>
                             );
@@ -489,49 +503,41 @@ const TasksApp = ({ windowAPI }) => {
         // 2. Time Grid (Week/Day) - FIXED SCROLLING
         const renderTimeGrid = (days) => (
             <div
+                ref={scrollRef}
                 className="flex-1 overflow-auto bg-[#080808] relative custom-scroll flex"
                 onWheel={(e) => {
                     if (e.ctrlKey) {
                         e.preventDefault();
-                        setZoomLevel((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+                        setZoomLevel((z) => Math.min(3, Math.max(0.2, z + (e.deltaY > 0 ? -0.05 : 0.05))));
                     }
                 }}
             >
-                {/* Left Time Axis: No more gaps, height is strictly tied to zoomLevel */}
-                <div className="sticky left-0 w-12 bg-[#111] border-r border-gray-800 z-20 flex-shrink-0">
-                    {/* Header Spacer (matches the 32px height of the column headers) */}
-                    <div className="h-8 border-b border-gray-800 bg-[#111]" />
+                {/* LEFT TIME AXIS: The background spans the full height of the content */}
+                <div className="sticky left-0 bg-[#111] border-r border-gray-800 z-20 flex-shrink-0" style={{ height: `${24 * 60 * zoomLevel + 32}px` }}>
+                    <div className="h-8 border-b border-gray-800 bg-[#111] sticky top-0 z-30" /> {/* Top corner intersection */}
                     {Array.from({ length: 24 }).map((_, i) => (
-                        <div
-                            key={i}
-                            className="text-[9px] text-gray-500 font-mono text-right pr-2 border-b border-gray-800/20"
-                            style={{
-                                height: `${60 * zoomLevel}px`,
-                                lineHeight: `${60 * zoomLevel}px`, // Centers the text vertically
-                            }}
-                        >
+                        <div key={i} className="text-[10px] text-gray-500 font-mono text-right pr-2 border-b border-gray-800/20" style={{ height: `${60 * zoomLevel}px`, lineHeight: `${20 * zoomLevel}px` }}>
                             {i}:00
                         </div>
                     ))}
                 </div>
 
-                <div className="flex flex-1 min-w-max">
+                <div className="flex flex-1" style={{ height: `${24 * 60 * zoomLevel + 32}px` }}>
                     {days.map((dateObj, idx) => {
                         const dateStr = dateObj.toDateString();
                         const dayLogs = logs.filter((l) => new Date(l.start_time).toDateString() === dateStr);
-
                         return (
-                            <div key={idx} className="flex-1 border-r border-gray-800/50 relative min-w-[200px]">
-                                {/* FIXED: Ghosting - Wrapped in <span> and <div> */}
-                                <div className="sticky top-0 bg-[#111]/95 h-8 flex items-center justify-center text-[10px] font-bold text-gray-400 border-b border-gray-700 z-10">
+                            <div key={idx} className="flex-1 border-r border-gray-800/50 relative min-w-[200px] bg-[#0c0c0c]">
+                                {/* TOP DATE HEADER: Sticky and covers the full width */}
+                                <div className="sticky top-0 bg-[#111] h-8 flex items-center justify-center text-[10px] font-bold text-gray-300 border-b border-gray-700 z-10 shadow-md">
                                     <span>{dateObj.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
                                 </div>
 
-                                <div className="relative" style={{ height: `${24 * 60 * zoomLevel}px` }}>
+                                <div className="relative w-full" style={{ height: `${24 * 60 * zoomLevel}px` }}>
                                     {Array.from({ length: 24 }).map((_, i) => (
                                         <div key={i} className="border-b border-gray-800/10 w-full absolute" style={{ top: `${i * 60 * zoomLevel}px`, height: `${60 * zoomLevel}px` }} />
                                     ))}
-                                    {/* ... log rendering logic ... */}
+                                    {/* Logs... */}
                                 </div>
                             </div>
                         );
@@ -563,20 +569,21 @@ const TasksApp = ({ windowAPI }) => {
     // 5. MAIN RENDER
     // -------------------------------------------------------------------------
     return (
-    <div className="relative h-full w-full flex flex-col pt-8 overflow-visible">
-        
-        {/* 1. Header (The Pill) sits in the pt-8 space and can overflow top/left/right */}
-        {renderHeader()}
+        <div className="h-full w-full flex flex-col pt-10 overflow-visible relative">
+            {/* Pill floats in the pt-10 zone */}
+            {renderHeader()}
 
-        {/* 2. Main Window Body (The rounded, bordered container) */}
-        <div className="flex-1 relative bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl flex flex-col overflow-hidden">
-            {view === "dashboard" && renderDashboard()}
-            {view === "history" && renderHistory()}
-            {view === "calendar" && renderCalendar()}
-        </div>
+            {/* The Body uses flex-1 to fill the remaining HDWindowFrame space */}
+            <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl overflow-hidden relative">
+                {view === "dashboard" && renderDashboard()}
+                {view === "history" && renderHistory()}
+                {view === "calendar" && renderCalendar()}
+            </div>
 
-            {/* 3. RESIZE HINT (Visible logic for the bottom right) */}
-            <div className="absolute bottom-1 right-1 w-2 h-2 border-r border-b border-gray-600 pointer-events-none opacity-50" />
+            {/* Visual resize handle in bottom right corner */}
+            <div className="absolute bottom-1 right-1 pointer-events-none opacity-20">
+                <div className="w-4 h-4 border-r-2 border-b-2 border-white"></div>
+            </div>
         </div>
     );
 };
