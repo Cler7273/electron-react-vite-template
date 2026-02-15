@@ -38,7 +38,6 @@
 .day-view-container {
   position: relative;
   flex: 1;
-  overflow-y: auto;
   background: repeating-linear-gradient(
     0deg,
     #1f2937 0px,
@@ -63,7 +62,6 @@
   border-radius: 4px;
   padding: 4px;
   font-size: 11px;
-  overflow: hidden;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   cursor: pointer;
   transition: transform 0.1s;
@@ -100,7 +98,6 @@
   width: 100%;
   background-color: #000;
   color: #e5e7eb;
-  overflow: hidden;
 }
 
 /* Custom Scrollbar for better visibility */
@@ -127,7 +124,6 @@
   gap: 8px;
   padding: 10px;
   height: 100%;
-  overflow-y: auto;
 }
 
 .mini-month {

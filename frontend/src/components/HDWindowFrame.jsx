@@ -3,41 +3,14 @@ import Draggable from 'react-draggable';
 import { ResizableBox } from 'react-resizable';
 import "react-resizable/css/styles.css";
 
-/**
- * HDWindowFrame (Headless Distributed Window Frame)
- * Provides DRAG and RESIZE physics without any UI.
- * Delegates all controls to the child component via the 'windowAPI' prop.
- */
-const HDWindowFrame = ({ 
-    children, 
-    initialPos = { x: 100, y: 100 }, 
-    initialSize = { width: 500, height: 600 },
-    onSaveLayout // Callback to persist x, y, w, h to DB
-}) => {
-    const nodeRef = useRef(null);
+const HDWindowFrame = ({ children, initialPos, initialSize = { width: 500, height: 600 }, onDelete, onUpdate }) => {
+    const nodeRef = useRef(null); // The master reference
     const [size, setSize] = useState(initialSize);
 
-    // This API object is passed to the child (TasksApp)
     const windowAPI = {
-        dragHandleClass: "hd-drag-handle", // The child must use this class on its drag element
+        dragHandleClass: "hd-drag-handle",
         size: size,
-        close: () => {
-            // logic to unmount/delete this frame
-            if (window.confirm("Close this application?")) {
-                // Trigger parent deletion logic (passed via props usually)
-            }
-        }
-    };
-
-    const handleResize = (e, data) => {
-        const newSize = { width: data.size.width, height: data.size.height };
-        setSize(newSize);
-    };
-
-    const handleStop = (e, data) => {
-        if (onSaveLayout) {
-            onSaveLayout({ x: data.x, y: data.y, w: size.width, h: size.height });
-        }
+        close: () => onDelete?.()
     };
 
     return (
@@ -45,31 +18,27 @@ const HDWindowFrame = ({
             nodeRef={nodeRef} 
             handle={`.${windowAPI.dragHandleClass}`} 
             defaultPosition={initialPos}
-            onStop={handleStop}
+            onStop={(e, data) => onUpdate?.({ x: data.x, y: data.y, w: size.width, h: size.height })}
         >
-            <div 
-                ref={nodeRef} 
-                className="absolute z-50 group" // 'group' allows showing resize handles on hover
-                style={{ width: size.width, height: size.height }}
-            >
+            {/* The actual element being moved/resized */}
+            <div ref={nodeRef} className="absolute z-50 group" style={{ width: size.width, height: size.height }}>
                 <ResizableBox
                     width={size.width}
                     height={size.height}
-                    onResize={handleResize}
-                    onResizeStop={handleStop}
+                    onResize={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
+                    onResizeStop={(e, data) => onUpdate?.({ x: initialPos.x, y: initialPos.y, w: data.size.width, h: data.size.height })}
                     minConstraints={[350, 400]}
-                    maxConstraints={[1200, 1000]}
-                    // SE = South East (bottom right)
-                    resizeHandles={['se', 'e', 's']}
-                    handle={(
-                        <div className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-[60] opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="w-full h-full border-r-2 border-b-2 border-blue-500/50 rounded-br-md" />
-                        </div>
+                    resizeHandles={['e', 's', 'se']}
+                    handle={(h) => (
+                        <div className={`absolute z-[60] hover:bg-blue-500/20 transition-colors
+                            ${h === 'e' ? 'right-0 top-0 w-2 h-full cursor-ew-resize' : 
+                              h === 's' ? 'bottom-0 left-0 h-2 w-full cursor-ns-resize' : 
+                              'bottom-0 right-0 w-5 h-5 cursor-nwse-resize border-r-4 border-b-4 border-blue-500/30'}`} 
+                        />
                     )}
                 >
-                    {/* Inject the API into the child */}
-                    <div className="w-full h-full pointer-events-auto">
-                        {React.cloneElement(children, { windowAPI })}
+                    <div className="w-full h-full relative pointer-events-auto overflow-visible">
+                        {React.isValidElement(children) ? React.cloneElement(children, { windowAPI }) : children}
                     </div>
                 </ResizableBox>
             </div>

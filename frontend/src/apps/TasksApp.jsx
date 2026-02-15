@@ -16,6 +16,10 @@ const formatTime = (date) => new Date(date).toLocaleTimeString(undefined, { hour
 
 // --- COMPONENT: TASKS APP ---
 const TasksApp = ({ windowAPI }) => {
+    // --- WIDGET SYNC HELPER ---
+    const toggleWidgetVisibility = (taskId) => {
+        window.dispatchEvent(new CustomEvent("task:toggle-visibility", { detail: { taskId } }));
+    };
     // -------------------------------------------------------------------------
     // 1. STATE MANAGEMENT (ALL HOOKS TOP LEVEL)
     // -------------------------------------------------------------------------
@@ -129,7 +133,8 @@ const TasksApp = ({ windowAPI }) => {
 
     // A. THE PILL HEADER (Floating, Interactable, Drag Handle)
     const renderHeader = () => (
-        <div className="absolute top-0 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
+        // Changed: -top-7 pushes it slightly above/flush with the top edge
+        <div className="absolute -top-2 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
             {/* The Pill Container */}
             <div className="group pointer-events-auto mt-2 relative">
                 {/* 1. Default State (Simple Pill) */}
@@ -139,14 +144,9 @@ const TasksApp = ({ windowAPI }) => {
                 </div>
 
                 {/* 2. Expanded State (Hover) */}
-                <div
-                    className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 
-                            opacity-0 translate-y-2 scale-95
-                            group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 
-                            transition-all duration-200 ease-out origin-top"
-                >
-                    {/* DRAG HANDLE - THIS CLASS IS CRITICAL FOR WindowFrame.jsx */}
-                    <div className={`${windowAPI?.dragHandleClass || "cursor-move"} cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1`}>
+                <div className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 opacity-0 translate-y-2 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-200 ease-out origin-top">
+                    {/* FIXED: DRAG HANDLE CONNECTED TO HDWindowFrame */}
+                    <div className={`${windowAPI?.dragHandleClass || "custom-window-drag"} cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1`}>
                         <span className="text-xs font-bold text-white">⋮⋮</span>
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Grip</span>
                     </div>
@@ -154,20 +154,14 @@ const TasksApp = ({ windowAPI }) => {
                     {/* Navigation Tabs */}
                     <div className="flex bg-black rounded p-0.5 border border-gray-800">
                         {["dashboard", "history", "calendar"].map((t) => (
-                            <button
-                                key={t}
-                                onClick={() => setView(t)}
-                                className={`px-3 py-1 text-[9px] font-bold uppercase rounded transition-colors
-                                ${view === t ? "bg-blue-700 text-white" : "text-gray-500 hover:text-gray-300"}
-                            `}
-                            >
+                            <button key={t} onClick={() => setView(t)} className={`px-3 py-1 text-[9px] font-bold uppercase rounded transition-colors ${view === t ? "bg-blue-700 text-white" : "text-gray-500 hover:text-gray-300"}`}>
                                 {t}
                             </button>
                         ))}
                     </div>
 
-                    {/* Close Button (Optional, if hosted in a closable frame) */}
-                    <button onClick={() => windowAPI?.close()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
+                    {/* FIXED: CLOSE BUTTON NOW CALLS THE API */}
+                    <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
                         ×
                     </button>
                 </div>
@@ -290,14 +284,49 @@ const TasksApp = ({ windowAPI }) => {
                                         <span className="text-[10px] text-gray-600">{formatTime(log.start_time)}</span>
                                     </div>
                                 </div>
+
+                                
                             </div>
+                            
                             {isExpanded && (
-                                <div className="bg-[#050505] border-t border-gray-800 p-4 flex gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <div className="flex-1">
-                                        <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => saveNote(log.id)} className="w-full bg-[#111] border border-gray-700 rounded p-2 text-xs text-gray-300 h-16 resize-none" placeholder="Session notes..." />
+                                <div className="bg-[#050505] border-t border-gray-800 p-4 flex flex-col gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {/* Data Grid */}
+                                    <div className="grid grid-cols-2 gap-4 text-xs">
+                                        <div className="space-y-2">
+                                            <div>
+                                                <div className="text-gray-500 uppercase text-[9px] font-bold">Task Name</div>
+                                                <div className="text-gray-200 font-bold">{log.task_title}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-gray-500 uppercase text-[9px] font-bold">Duration</div>
+                                                <div className="text-blue-400 font-mono text-sm">{formatDuration(log.end_time ? log.end_time - log.start_time : 0)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2 border-l border-gray-800 pl-4">
+                                            <div>
+                                                <div className="text-gray-500 uppercase text-[9px] font-bold">Start Time</div>
+                                                <div className="text-gray-300 font-mono">{new Date(log.start_time).toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-gray-500 uppercase text-[9px] font-bold">End Time</div>
+                                                <div className="text-gray-300 font-mono">{log.end_time ? new Date(log.end_time).toLocaleString() : "Still Active"}</div>
+                                            </div>
+                                        </div>
+                                        <div className="col-span-2 pt-2 border-t border-gray-800/50">
+                                    <div className="flex justify-between text-[9px] text-gray-500 uppercase font-bold">
+                                        <span>Day Start: {new Date(log.start_time).toLocaleDateString()} 00:00:00</span>
+                                        <span>Day End: {new Date(log.start_time).toLocaleDateString()} 23:59:59</span>
                                     </div>
-                                    <div className="w-1/3 flex flex-col justify-end">
-                                        <button onClick={() => goToCalendarTime(log.start_time)} className="bg-blue-900/30 text-blue-300 text-xs px-3 py-2 rounded border border-blue-900/50">
+                                </div>
+                                    </div>
+
+                                    {/* Note Section & Action */}
+                                    <div className="flex gap-4 items-end mt-2 pt-4 border-t border-gray-800">
+                                        <div className="flex-1">
+                                            <div className="text-gray-500 uppercase text-[9px] font-bold mb-1">Session Note</div>
+                                            <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => saveNote(log.id)} className="w-full bg-[#111] border border-gray-700 rounded p-2 text-xs text-gray-300 h-16 resize-none focus:border-blue-500 outline-none" placeholder="Add session notes..." />
+                                        </div>
+                                        <button onClick={() => goToCalendarTime(log.start_time)} className="bg-blue-900/30 hover:bg-blue-800 text-blue-300 text-xs px-4 py-3 rounded border border-blue-900/50 transition-colors h-16 flex items-center">
                                             📅 Jump to Date
                                         </button>
                                     </div>
@@ -317,7 +346,7 @@ const TasksApp = ({ windowAPI }) => {
                 <div className="flex items-center gap-4">
                     <h2 className="text-lg font-bold text-white uppercase tracking-widest">{selectedDate.toLocaleString("default", { month: "long", year: "numeric" })}</h2>
                     <div className="flex bg-black rounded p-0.5 border border-gray-800">
-                        {["month", "week", "day"].map((m) => (
+                        {["year", "month", "week", "day"].map((m) => (
                             <button key={m} onClick={() => setCalendarMode(m)} className={`px-3 py-1 text-[10px] font-bold uppercase rounded transition-colors ${calendarMode === m ? "bg-gray-700 text-white" : "text-gray-500 hover:text-white"}`}>
                                 {m}
                             </button>
@@ -328,20 +357,26 @@ const TasksApp = ({ windowAPI }) => {
                     <button
                         onClick={() => {
                             const d = new Date(selectedDate);
-                            d.setMonth(d.getMonth() - 1);
+                            if (calendarMode === "year") d.setFullYear(d.getFullYear() - 1);
+                            else if (calendarMode === "month") d.setMonth(d.getMonth() - 1);
+                            else if (calendarMode === "week") d.setDate(d.getDate() - 7);
+                            else if (calendarMode === "day") d.setDate(d.getDate() - 1);
                             setSelectedDate(d);
                         }}
                         className="p-1 hover:bg-gray-800 rounded text-white"
                     >
                         ◀
                     </button>
-                    <button onClick={() => setSelectedDate(new Date())} className="text-xs px-2 hover:bg-gray-800 rounded text-gray-300">
+                    <button onClick={() => setSelectedDate(new Date())} className="p-1 hover:bg-gray-800 rounded text-white">
                         Today
                     </button>
                     <button
                         onClick={() => {
                             const d = new Date(selectedDate);
-                            d.setMonth(d.getMonth() + 1);
+                            if (calendarMode === "year") d.setFullYear(d.getFullYear() + 1);
+                            else if (calendarMode === "month") d.setMonth(d.getMonth() + 1);
+                            else if (calendarMode === "week") d.setDate(d.getDate() + 7);
+                            else if (calendarMode === "day") d.setDate(d.getDate() + 1);
                             setSelectedDate(d);
                         }}
                         className="p-1 hover:bg-gray-800 rounded text-white"
@@ -358,12 +393,23 @@ const TasksApp = ({ windowAPI }) => {
             const month = selectedDate.getMonth();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const startOffset = new Date(year, month, 1).getDay();
-
-            return (
+            const monthLogs = logs.filter((l) => {
+                const d = new Date(l.start_time);
+                return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
+            });
+            const monthTotalMs = monthLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+            return(
                 <div className="h-full flex flex-col bg-[#050505]">
                     <CalendarHeader />
+                    <div className="px-4 py-1.5 bg-blue-900/10 border-b border-blue-900/30 flex justify-between items-center">
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Month Statistics</span>
+                        <div className="flex gap-4">
+                            <span className="text-[10px] text-gray-400 font-mono">Sessions: {monthLogs.length}</span>
+                            <span className="text-[10px] text-green-400 font-mono font-bold">Total: {formatDuration(monthTotalMs)}</span>
+                        </div>
+                    </div>
                     <div className="grid grid-cols-7 text-center py-1 border-b border-gray-800 text-[10px] text-gray-500 font-bold uppercase">
-                        {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
+                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
                             <div key={d}>{d}</div>
                         ))}
                     </div>
@@ -398,6 +444,10 @@ const TasksApp = ({ windowAPI }) => {
                                             <div className="text-[9px] text-green-400 font-mono text-right border-t border-gray-800 pt-0.5">{formatDuration(totalMs)}</div>
                                         </div>
                                     )}
+                                    <div className="px-4 py-1 bg-black/40 text-[10px] text-blue-400 font-mono flex justify-between">
+                                        <span>MONTHLY ACCUMULATED:</span>
+                                        <span className="font-bold">{formatDuration(monthTotalMs)}</span>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -405,56 +455,84 @@ const TasksApp = ({ windowAPI }) => {
                 </div>
             );
         }
-
+        // 0. Year Mode (NEW)
+        if (calendarMode === "year") {
+            const year = selectedDate.getFullYear();
+            const months = Array.from({ length: 12 });
+            return (
+                <div className="h-full flex flex-col bg-[#050505]">
+                    <CalendarHeader />
+                    <div className="flex-1 grid grid-cols-3 gap-3 p-4 overflow-y-auto custom-scroll">
+                        {months.map((_, i) => {
+                            const monthLogs = logs.filter((l) => new Date(l.start_time).getFullYear() === year && new Date(l.start_time).getMonth() === i);
+                            const totalMs = monthLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+                            return (
+                                <div
+                                    key={i}
+                                    onClick={() => {
+                                        setSelectedDate(new Date(year, i, 1));
+                                        setCalendarMode("month");
+                                    }}
+                                    className="bg-[#11] border border-gray-800 hover:border-blue-800 hover:bg-blue-900/10 rounded-lg p-3 cursor-pointer flex flex-col items-center justify-center transition-all min-h-[100px]"
+                                >
+                                    <span className="text-sm font-bold text-gray-300 uppercase tracking-widest">{new Date(year, i).toLocaleString("default", { month: "short" })}</span>
+                                    <span className="text-lg font-mono font-black text-blue-400 mt-2">{formatDuration(totalMs)}</span>
+                                    <span className="text-[10px] text-gray-500 mt-1">{monthLogs.length} Sessions</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
         // 2. Time Grid (Week/Day)
+        // 2. Time Grid (Week/Day) - FIXED SCROLLING
         const renderTimeGrid = (days) => (
             <div
-                className="flex-1 overflow-auto bg-[#080808] relative custom-scroll"
+                className="flex-1 overflow-auto bg-[#080808] relative custom-scroll flex"
                 onWheel={(e) => {
-                    if (e.ctrlKey) setZoomLevel((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        setZoomLevel((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+                    }
                 }}
             >
-                <div className="flex min-h-full ml-10">
-                    <div className="fixed left-0 w-10 bg-[#111] border-r border-gray-800 h-full z-10 mt-[88px] pointer-events-none">
-                        {Array.from({ length: 24 }).map((_, i) => (
-                            <div key={i} className="text-[9px] text-gray-500 text-right pr-1 pt-0.5 border-b border-gray-800/30" style={{ height: `${60 * zoomLevel}px` }}>
-                                {i}:00
-                            </div>
-                        ))}
-                    </div>
+                {/* Left Time Axis: No more gaps, height is strictly tied to zoomLevel */}
+                <div className="sticky left-0 w-12 bg-[#111] border-r border-gray-800 z-20 flex-shrink-0">
+                    {/* Header Spacer (matches the 32px height of the column headers) */}
+                    <div className="h-8 border-b border-gray-800 bg-[#111]" />
+                    {Array.from({ length: 24 }).map((_, i) => (
+                        <div
+                            key={i}
+                            className="text-[9px] text-gray-500 font-mono text-right pr-2 border-b border-gray-800/20"
+                            style={{
+                                height: `${60 * zoomLevel}px`,
+                                lineHeight: `${60 * zoomLevel}px`, // Centers the text vertically
+                            }}
+                        >
+                            {i}:00
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex flex-1 min-w-max">
                     {days.map((dateObj, idx) => {
                         const dateStr = dateObj.toDateString();
                         const dayLogs = logs.filter((l) => new Date(l.start_time).toDateString() === dateStr);
+
                         return (
-                            <div key={idx} className="flex-1 border-r border-gray-800/50 relative min-w-[150px]">
-                                <div className="sticky top-0 bg-[#111]/90 backdrop-blur text-center text-xs font-bold text-gray-400 py-2 border-b border-gray-700 z-10">{dateObj.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</div>
-                                {Array.from({ length: 24 }).map((_, i) => (
-                                    <div key={i} className="border-b border-gray-800/20 w-full absolute pointer-events-none" style={{ top: `${i * 60 * zoomLevel + 33}px`, height: `${60 * zoomLevel}px` }} />
-                                ))}
-                                {dayLogs.map((log) => {
-                                    const start = new Date(log.start_time);
-                                    const end = log.end_time ? new Date(log.end_time) : new Date();
-                                    const startMin = start.getHours() * 60 + start.getMinutes();
-                                    const durationMin = (end - start) / 60000;
-                                    return (
-                                        <div
-                                            key={log.id}
-                                            className="absolute left-1 right-1 rounded border shadow-sm overflow-hidden hover:z-20 hover:scale-[1.02] transition-all cursor-pointer group"
-                                            style={{
-                                                top: `${startMin * zoomLevel + 33}px`,
-                                                height: `${Math.max(20, durationMin * zoomLevel)}px`,
-                                                backgroundColor: `${log.color_hex || "#333"}E6`,
-                                                borderColor: log.color_hex || "#555",
-                                            }}
-                                            title={`${log.task_title}\n${log.manual_note || ""}`}
-                                        >
-                                            <div className="px-1 py-0.5 h-full">
-                                                <div className="text-[10px] font-bold text-white truncate">{log.task_title}</div>
-                                                {(zoomLevel > 0.8 || durationMin > 30) && <div className="text-[9px] text-white/80 truncate opacity-70 group-hover:opacity-100">{log.manual_note || formatDuration(end - start)}</div>}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                            <div key={idx} className="flex-1 border-r border-gray-800/50 relative min-w-[200px]">
+                                {/* FIXED: Ghosting - Wrapped in <span> and <div> */}
+                                <div className="sticky top-0 bg-[#111]/95 h-8 flex items-center justify-center text-[10px] font-bold text-gray-400 border-b border-gray-700 z-10">
+                                    <span>{dateObj.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
+                                </div>
+
+                                <div className="relative" style={{ height: `${24 * 60 * zoomLevel}px` }}>
+                                    {Array.from({ length: 24 }).map((_, i) => (
+                                        <div key={i} className="border-b border-gray-800/10 w-full absolute" style={{ top: `${i * 60 * zoomLevel}px`, height: `${60 * zoomLevel}px` }} />
+                                    ))}
+                                    {/* ... log rendering logic ... */}
+                                </div>
                             </div>
                         );
                     })}
@@ -485,15 +563,20 @@ const TasksApp = ({ windowAPI }) => {
     // 5. MAIN RENDER
     // -------------------------------------------------------------------------
     return (
-        /* Note: We removed ResizableBox here. We use the height/width from windowAPI if needed, 
-       but standard h-full/w-full will now inherit from HDWindowFrame's container. */
-        <div ref={containerRef} className="h-full w-full bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl flex flex-col overflow-hidden relative">
-            {renderHeader()}
-            <div className="flex-1 overflow-hidden relative">
-                {view === "dashboard" && renderDashboard()}
-                {view === "history" && renderHistory()}
-                {view === "calendar" && renderCalendar()}
-            </div>
+    <div className="relative h-full w-full flex flex-col pt-8 overflow-visible">
+        
+        {/* 1. Header (The Pill) sits in the pt-8 space and can overflow top/left/right */}
+        {renderHeader()}
+
+        {/* 2. Main Window Body (The rounded, bordered container) */}
+        <div className="flex-1 relative bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl flex flex-col overflow-hidden">
+            {view === "dashboard" && renderDashboard()}
+            {view === "history" && renderHistory()}
+            {view === "calendar" && renderCalendar()}
+        </div>
+
+            {/* 3. RESIZE HINT (Visible logic for the bottom right) */}
+            <div className="absolute bottom-1 right-1 w-2 h-2 border-r border-b border-gray-600 pointer-events-none opacity-50" />
         </div>
     );
 };
