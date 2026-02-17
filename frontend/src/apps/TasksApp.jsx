@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ResizableBox } from "react-resizable";
+import "react-resizable/css/styles.css"; // Basic styles for resizable handles
+import TaskWidget from "../components/TaskWidget";
 import * as API from "../api";
 import "../styles/calendar.css"; // Ensure you have basic calendar styles or Tailwind
 
@@ -10,22 +12,55 @@ const formatDuration = (ms) => {
     const mins = Math.floor((ms % 3600000) / 60000);
     return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
 };
+// --- HOOK: TASK SYSTEM ---
+const useTaskSystem = (setTasks, setLogs) => {
+    const [activeSession, setActiveSession] = useState(null);
 
+    const refreshActive = async () => {
+        const session = await API.getActiveSession();
+        setActiveSession(session);
+    };
+
+    const handleStart = async (taskId) => {
+        try {
+            await API.startTask(taskId);
+            await refreshActive();
+            window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+        } catch (e) {
+            if (e.message.includes("already running")) {
+                // Backend returns 409 with running task info
+                if (confirm("Another protocol is active. Stop it and switch?")) {
+                    // Logic to stop current and start new could go here
+                }
+            } else {
+                alert(e.message);
+            }
+        }
+    };
+
+    const handleStop = async (taskId, noteDraft = "") => {
+        const result = await API.stopTask(taskId, { manual_note: noteDraft });
+        if (result.success) {
+            // Atomic update: Replace the task in the list with the fresh one from DB
+            setTasks((prev) => prev.map((t) => (t.id === taskId ? result.task : t)));
+            setActiveSession(null);
+            window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+        }
+    };
+
+    return { activeSession, refreshActive, handleStart, handleStop };
+};
 const formatDate = (date) => new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const formatTime = (date) => new Date(date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 // --- COMPONENT: TASKS APP ---
-const TasksApp = ({ windowAPI , isHeaderOnly }) => {
+const TasksApp = ({ windowAPI, isHeaderOnly }) => {
     const scrollRef = useRef(null); // Add this at the top of TasksApp
-    // --- WIDGET SYNC HELPER ---
-    const toggleWidgetVisibility = (taskId) => {
-        window.dispatchEvent(new CustomEvent("task:toggle-visibility", { detail: { taskId } }));
-    };
-    // -------------------------------------------------------------------------
-    // 1. STATE MANAGEMENT (ALL HOOKS TOP LEVEL)
-    // -------------------------------------------------------------------------
+    // Inside TasksApp Component:
 
-    // UI View State
+    const [activeSession, setActiveSession] = useState(null);
+    const [tasks, setTasks] = useState([]);
+    const [logs, setLogs] = useState([]);
     const [view, setView] = useState("dashboard"); // 'dashboard', 'history', 'calendar'
 
     // Calendar Specific State
@@ -42,12 +77,69 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
     const [noteDraft, setNoteDraft] = useState("");
 
     // Data State
-    const [tasks, setTasks] = useState([]);
-    const [logs, setLogs] = useState([]);
+
     const [newTask, setNewTask] = useState("");
 
     // Ref for resizing context
     const containerRef = useRef(null);
+    const { refreshActive, handleStart, handleStop } = useTaskSystem(setTasks, setLogs);
+    // Updated LoadData: Only fetch Task definitions and Heartbeat
+    const loadBaseData = async () => {
+        try {
+            const tData = await API.getTasks();
+            setTasks(tData.tasks || []);
+            await refreshActive();
+        } catch (e) {
+            console.error("Base load failed", e);
+        }
+    };
+
+    // NEW: Specialized Loader for History/Calendar (Lazy Loading)
+    useEffect(() => {
+        const loadLogs = async () => {
+            if (view === "dashboard") return;
+
+            let start, end;
+            if (view === "calendar") {
+                const year = selectedDate.getFullYear();
+                const month = selectedDate.getMonth();
+
+                if (calendarMode === "month") {
+                    // Get FULL month range (1st 00:00 to Last Day 23:59)
+                    start = new Date(year, month, 1).toISOString();
+                    end = new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString();
+                } else if (calendarMode === "day") {
+                    start = new Date(year, month, selectedDate.getDate(), 0, 0, 0).toISOString();
+                    end = new Date(year, month, selectedDate.getDate(), 23, 59, 59, 999).toISOString();
+                } else if (calendarMode === "year") {
+                    // Fetch whole year
+                    start = new Date(year, 0, 1).toISOString();
+                    end = new Date(year, 11, 31, 23, 59, 59).toISOString();
+                }
+            }
+
+            // Pass these directly to API
+            const lData = await API.getHistory(start, end);
+            setLogs(lData || []);
+        };
+        loadLogs();
+    }, [view, calendarMode, selectedDate]);
+
+    // Update initial load
+    useEffect(() => {
+        loadBaseData();
+        const interval = setInterval(refreshActive, 30000); // Pulse check every 30s
+        return () => clearInterval(interval);
+    }, []);
+    // --- WIDGET SYNC HELPER ---
+    const toggleWidgetVisibility = (taskId) => {
+        window.dispatchEvent(new CustomEvent("task:toggle-visibility", { detail: { taskId } }));
+    };
+    // -------------------------------------------------------------------------
+    // 1. STATE MANAGEMENT (ALL HOOKS TOP LEVEL)
+    // -------------------------------------------------------------------------
+
+    // UI View State
 
     // -------------------------------------------------------------------------
     // 2. SYNCHRONIZATION & DATA LOADING
@@ -88,23 +180,40 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
     // 3. ACTIONS (CRUD)
     // -------------------------------------------------------------------------
 
+    const handleTaskAction = async (task, action) => {
+        if (action === "toggle") {
+            try {
+                if (task.is_running || activeSession?.id === task.id) {
+                    const res = await API.stopTask(task.id, { manual_note: noteDraft });
+                    setTasks((prev) => prev.map((t) => (t.id === task.id ? res.task : t)));
+                    setNoteDraft("");
+                } else {
+                    await API.startTask(task.id);
+                }
+                await refreshActive();
+                window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+            } catch (e) {
+                alert(e.message);
+            }
+        } else if (action === "terminate") {
+            if (confirm("Retire task?")) {
+                await API.terminateTask(task.id);
+                loadBaseData();
+            }
+        } else if (action === "delete") {
+            if (confirm("Permanently delete?")) {
+                await API.deleteTask(task.id);
+                loadBaseData();
+            }
+        }
+    };
+
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!newTask.trim()) return;
         await API.createTask(newTask);
         setNewTask("");
-        broadcastSync();
-    };
-
-    const handleTaskAction = async (task, action) => {
-        if (action === "toggle") {
-            await API.toggleTask(task.id, task.is_running ? "stop" : "start");
-        } else if (action === "terminate") {
-            if (confirm("Retire task?")) await API.terminateTask(task.id);
-        } else if (action === "delete") {
-            if (confirm("Permanently delete?")) await API.deleteTask(task.id);
-        }
-        broadcastSync();
+        loadBaseData(); // Refresh list
     };
 
     const saveNote = async (logId) => {
@@ -121,24 +230,19 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
 
     const goToCalendarTime = (isoString) => {
         const date = new Date(isoString);
+        // Setting these states triggers the specialized useEffect in Step 3
         setSelectedDate(date);
         setCalendarMode("day");
         setView("calendar");
 
-        // Calculate vertical scroll position
-        const hours = date.getHours();
-        const minutes = date.getMinutes();
-        const scrollTarget = (hours * 60 + minutes) * zoomLevel;
-
-        // Wait for the view to switch, then scroll
+        // Scroll logic remains same...
         setTimeout(() => {
             if (scrollRef.current) {
-                scrollRef.current.scrollTo({
-                    top: scrollTarget,
-                    behavior: "smooth",
-                });
+                const hours = date.getHours();
+                const scrollTarget = hours * 60 * zoomLevel;
+                scrollRef.current.scrollTo({ top: scrollTarget, behavior: "smooth" });
             }
-        }, 100);
+        }, 150);
     };
 
     // NOTE COLORS PRESET
@@ -166,7 +270,6 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
                         <span className="text-xs font-bold text-white">⋮⋮</span>
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Grip</span>
                     </div>
-
                     {/* Navigation Tabs */}
                     <div className="flex bg-black rounded p-0.5 border border-gray-800">
                         {["dashboard", "history", "calendar"].map((t) => (
@@ -175,7 +278,17 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
                             </button>
                         ))}
                     </div>
-
+                    <button
+                        onClick={async () => {
+                            const taskId = prompt("Enter Task ID to fill with data:");
+                            if (taskId) await API.apiFetch("/dev/generate-logs", { method: "POST", body: JSON.stringify({ taskId, count: 10 }) });
+                            alert("Generated. Refreshing...");
+                            window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+                        }}
+                        className="text-[8px] text-gray-700 hover:text-white"
+                    >
+                        DEV
+                    </button>
                     {/* FIXED: CLOSE BUTTON NOW CALLS THE API */}
                     <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
                         ×
@@ -290,6 +403,19 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
                                 className="flex items-center p-3 cursor-pointer select-none"
                             >
                                 <div className="w-1 h-8 rounded mr-3" style={{ backgroundColor: log.color_hex || "#555" }} />
+                                <button
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (confirm("Delete this specific session log? Time will be deducted.")) {
+                                            await API.deleteLog(log.id);
+                                            // Trigger reload
+                                            window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+                                        }
+                                    }}
+                                    className="text-red-500 hover:text-red-400 text-[10px] uppercase font-bold border border-red-900/50 bg-red-900/10 px-3 rounded hover:bg-red-900/30 transition-colors"
+                                >
+                                    Delete Log
+                                </button>
                                 <div className="flex-1">
                                     <div className="flex justify-between items-center">
                                         <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
@@ -572,7 +698,16 @@ const TasksApp = ({ windowAPI , isHeaderOnly }) => {
         <div className="h-full w-full flex flex-col pt-10 overflow-visible relative">
             {/* Pill floats in the pt-10 zone */}
             {renderHeader()}
-
+            {tasks.map((task) => (
+                <TaskWidget
+                    key={task.id}
+                    task={task}
+                    // Pass the trigger to refresh main app when widget updates
+                    onUpdate={() => {
+                        window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+                    }}
+                />
+            ))}
             {/* The Body uses flex-1 to fill the remaining HDWindowFrame space */}
             <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl overflow-hidden relative">
                 {view === "dashboard" && renderDashboard()}

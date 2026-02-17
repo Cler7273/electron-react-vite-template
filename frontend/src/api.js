@@ -30,8 +30,8 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 // --- TASKS CORE ---
-export const getTasks = () => apiFetch('/all'); // Expects { tasks: [] }
-export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
+
+
 
 // Actions
 // Updated toggleTask to accept body (for manual_note on stop)
@@ -40,13 +40,11 @@ export const toggleTask = (id, action, body = {}) =>
         method: 'POST', 
         body: JSON.stringify(body) 
     });
-export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }); 
+
 export const terminateTask = (id) => updateTask(id, { is_done: 1 }); // Soft Delete
 export const reviveTask = (id) => updateTask(id, { is_done: 0 }); // Undo Soft Delete
-export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' }); // Hard Delete
 
-// --- HISTORY & LOGS ---
-export const getHistory = () => apiFetch('/history');
+
 // Query specific range for Calendar
 export const getLogsByRange = (startStr, endStr) => apiFetch(`/tasks/logs?view=range&start=${startStr}&end=${endStr}`);
 
@@ -57,3 +55,22 @@ export const removeTagFromTask = (taskId, tagName) => apiFetch(`/tasks/${taskId}
 
 // --- UTILS ---
 export const selectFile = () => window.nativeAPI ? window.nativeAPI.selectFile() : null;
+// Add these to frontend/src/api.js for completeness, even if not used in TaskWidget.jsx
+// Update getHistory to handle optional range for lazy loading
+// Utility to update log notes after session is over
+export const updateLog = (logId, details) => 
+    apiFetch(`/history/${logId}`, { method: 'PUT', body: JSON.stringify(details) });
+
+export const getTasks = () => apiFetch('/all');
+export const getActiveSession = () => apiFetch('/tasks/active-session');
+export const getHistory = (start, end) => {
+    const q = (start && end) ? `?start=${start}&end=${end}` : '';
+    return apiFetch(`/history${q}`);
+};
+// frontend/src/api.js
+export const deleteLog = (logId) => apiFetch(`/history/${logId}`, { method: 'DELETE' });
+export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
+export const startTask = (id) => apiFetch(`/tasks/${id}/start`, { method: 'POST' });
+export const stopTask = (id, body) => apiFetch(`/tasks/${id}/stop`, { method: 'POST', body: JSON.stringify(body) });
+export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' });

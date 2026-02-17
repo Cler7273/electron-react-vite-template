@@ -1,14 +1,16 @@
+// backend/server.js - CHUNK 1
 const express = require("express");
 const cors = require("cors");
 const Database = require("better-sqlite3");
 const path = require("path");
 const fileService = require("./services/file-service");
-const dbService = require("./services/db-service");
+// const dbService = require("./services/db-service"); // Temporarily ignored as per instruction
 const systemService = require("./services/system-service");
 
 const PORT = 4000;
 const app = express();
 
+// Args handling
 const SECRET_TOKEN = process.argv[2];
 const USER_DATA_PATH = process.argv[3];
 
@@ -29,9 +31,10 @@ app.use((req, res, next) => {
     next();
 });
 
+// Database Initialization
 const db = new Database("cognicanvas.db");
 
-// --- NEW: Register Regex Function ---
+// Register Regex Function for Search
 db.function("regexp", (pattern, str) => {
     try {
         return new RegExp(pattern, "i").test(str) ? 1 : 0;
@@ -41,7 +44,7 @@ db.function("regexp", (pattern, str) => {
 });
 db.pragma("foreign_keys = ON");
 
-// --- ROBUST MIGRATION SYSTEM ---
+// --- MIGRATION SYSTEM ---
 const MIGRATIONS = [
     {
         version: 1,
@@ -99,7 +102,6 @@ const runMigrations = () => {
             if (migration.version > currentVersion) {
                 console.log(`[DB] Applying migration v${migration.version}...`);
                 try {
-                    // Defensive column check logic
                     const tableInfoTimeLogs = db.prepare("PRAGMA table_info(time_logs)").all();
                     const tableInfoTasks = db.prepare("PRAGMA table_info(tasks)").all();
 
@@ -130,7 +132,7 @@ const getTagsFor = (table, id) => {
     return db.prepare(`SELECT t.name, t.color_hex FROM tags t JOIN ${table}_tags nt ON t.id = nt.tag_id WHERE nt.${table}_id = ?`).all(id);
 };
 
-// --- API ROUTES: CANVAS ---
+// --- API ROUTES: GENERAL & CANVAS ---
 app.get("/api/shortcuts", (req, res) => {
     try {
         const shortcuts = db.prepare("SELECT * FROM shortcuts").all();
@@ -183,6 +185,7 @@ app.get("/api/all", (req, res) => {
         .prepare("SELECT * FROM tasks")
         .all()
         .map((task) => {
+            // Check for active session (is_running)
             const activeLog = db.prepare("SELECT start_time FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(task.id);
             const tags = getTagsFor("task", task.id);
             return {
@@ -307,55 +310,47 @@ app.put("/api/tags/:name", (req, res) => {
     res.json({ success: true });
 });
 
-// --- KEYS & CRYPTO ---
+// --- KEYS & CRYPTO (Stubbed to not fail, mostly ignored for now) ---
 app.get("/api/keys", async (req, res) => {
-    try {
-        res.json((await dbService.getKeys()) || []);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    // dbService is ignored as per instructions, returning empty array
+    res.json([]);
 });
-
 app.post("/api/keys", async (req, res) => {
-    try {
-        res.json({ success: true, result: await dbService.saveKey(req.body) });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    res.status(501).json({ error: "Not implemented in this version" });
 });
-
 app.delete("/api/keys/:id", async (req, res) => {
-    try {
-        await dbService.deleteKey(req.params.id);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    res.status(501).json({ error: "Not implemented in this version" });
 });
-
 app.post("/api/encrypt", async (req, res) => {
     const { filePath, keyConfig, intensity, savePath } = req.body;
-    const result = await fileService.encryptFile(
-        filePath,
-        keyConfig,
-        intensity,
-        savePath,
-        () => {},
-        () => {},
-    );
-    res.json(result);
+    try {
+        const result = await fileService.encryptFile(
+            filePath,
+            keyConfig,
+            intensity,
+            savePath,
+            () => {},
+            () => {},
+        );
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
-
 app.post("/api/decrypt", async (req, res) => {
     const { filePath, keyConfig, savePath } = req.body;
-    const result = await fileService.decryptFile(
-        filePath,
-        keyConfig,
-        savePath,
-        () => {},
-        () => {},
-    );
-    res.json(result);
+    try {
+        const result = await fileService.decryptFile(
+            filePath,
+            keyConfig,
+            savePath,
+            () => {},
+            () => {},
+        );
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // --- SYSTEM ---
@@ -379,33 +374,16 @@ app.put("/api/frames/:id", (req, res) => {
         const { title, pos_x, pos_y, width, height, is_collapsed } = req.body;
         const updates = [];
         const params = [];
-        if (title !== undefined) {
-            updates.push("title = ?");
-            params.push(title);
-        }
-        if (pos_x !== undefined) {
-            updates.push("pos_x = ?");
-            params.push(pos_x);
-        }
-        if (pos_y !== undefined) {
-            updates.push("pos_y = ?");
-            params.push(pos_y);
-        }
-        if (width !== undefined) {
-            updates.push("width = ?");
-            params.push(width);
-        }
-        if (height !== undefined) {
-            updates.push("height = ?");
-            params.push(height);
-        }
-        if (is_collapsed !== undefined) {
-            updates.push("is_collapsed = ?");
-            params.push(is_collapsed);
+
+        const fields = { title, pos_x, pos_y, width, height, is_collapsed };
+        for (const [key, val] of Object.entries(fields)) {
+            if (val !== undefined) {
+                updates.push(`${key} = ?`);
+                params.push(val);
+            }
         }
 
         params.push(req.params.id);
-
         db.prepare(`UPDATE frames SET ${updates.join(", ")} WHERE id = ?`).run(...params);
         res.json({ success: true });
     } catch (e) {
@@ -418,24 +396,51 @@ app.delete("/api/frames/:id", (req, res) => {
     res.json({ success: true });
 });
 
-// --- TASKS ---
+// backend/server.js - CHUNK 2
+
+// --- TASKS API ---
+
+// 1. STATUS ENDPOINT (Heartbeat)
+// Objective: Check if ANY task is currently running.
+// GET: The "Authority" check for persistence
+app.get("/api/tasks/active-session", (req, res) => {
+    try {
+        const activeLog = db
+            .prepare(
+                `
+            SELECT t.id, t.title, t.color_hex, t.total_time_ms, l.start_time, l.id as log_id 
+            FROM time_logs l 
+            JOIN tasks t ON l.task_id = t.id 
+            WHERE l.end_time IS NULL
+        `,
+            )
+            .get();
+
+        if (activeLog) {
+            const tags = getTagsFor("task", activeLog.id);
+            res.json({ ...activeLog, tags });
+        } else {
+            res.json(null);
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post("/api/tasks", (req, res) => {
     try {
         const { title, color_hex } = req.body;
         const stmt = db.prepare("INSERT INTO tasks (title, is_done, created_at, total_time_ms, color_hex) VALUES (?, 0, ?, 0, ?)");
         const info = stmt.run(title, Date.now(), color_hex || "#1f2937");
-        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0, color_hex: color_hex || "#1f2937" });
+        res.status(201).json({ id: info.lastInsertRowid, title, is_done: 0, total_time_ms: 0, color_hex: color_hex || "#1f2937", tags: [] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// EXPANDED: Update task properties including termination (is_done)
 app.put("/api/tasks/:id", (req, res) => {
     try {
         const { color_hex, title, is_done } = req.body;
-
-        // Use a dynamic update to handle partial bodies correctly
         const updates = [];
         const params = [];
 
@@ -463,7 +468,6 @@ app.put("/api/tasks/:id", (req, res) => {
     }
 });
 
-// DELETE Task: Transactional to clear logs and tags
 app.delete("/api/tasks/:id", (req, res) => {
     try {
         const deleteTransaction = db.transaction((id) => {
@@ -478,39 +482,47 @@ app.delete("/api/tasks/:id", (req, res) => {
     }
 });
 
+// 2. START TASK (Validation)
+// Objective: Prevent starting a new task if one is already running (Global Singleton).
 app.post("/api/tasks/:id/start", (req, res) => {
     try {
         const { id } = req.params;
         const now = new Date().toISOString();
-        const running = db.prepare("SELECT id FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(id);
+        const running = db.prepare(`SELECT t.id, t.title FROM time_logs l JOIN tasks t ON l.task_id = t.id WHERE l.end_time IS NULL`).get();
 
-        if (running) return res.status(409).json({ error: "Session already running for this task." });
+        if (running) {
+            return res.status(409).json({ error: "Protocol already active", runningTask: running });
+        }
 
         const info = db.prepare("INSERT INTO time_logs (task_id, start_time) VALUES (?, ?)").run(id, now);
         res.json({ logId: info.lastInsertRowid, start_time: now });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
+// 3. ATOMIC STOP
+// Objective: Stop timer, update totals, and return the FULL updated task object to sync frontend.
+// POST: Atomic Stop with full task return
 app.post("/api/tasks/:id/stop", (req, res) => {
     try {
-        const { rating, notes, manual_note } = req.body;
+        const { manual_note } = req.body;
         const nowStr = new Date().toISOString();
-        const now = new Date(nowStr).getTime();
-
         const log = db.prepare("SELECT * FROM time_logs WHERE task_id = ? AND end_time IS NULL").get(req.params.id);
 
         if (log) {
-            const startTimeMs = new Date(log.start_time).getTime();
-            const durationMs = now - startTimeMs;
-            const durationSec = durationMs / 1000;
+            const durationMs = new Date(nowStr).getTime() - new Date(log.start_time).getTime();
 
-            db.prepare("UPDATE time_logs SET end_time = ?, rating = ?, session_notes = ?, manual_note = ? WHERE id = ?").run(nowStr, rating || 0, notes || "", manual_note || "", log.id);
+            db.transaction(() => {
+                db.prepare("UPDATE time_logs SET end_time = ?, manual_note = ? WHERE id = ?").run(nowStr, manual_note || "", log.id);
+                db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(durationMs, req.params.id);
+            })();
 
-            db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?").run(durationMs, req.params.id);
-
-            res.json({ success: true, duration: durationSec, end_time: nowStr });
+            const updatedTask = db.prepare("SELECT * FROM tasks WHERE id = ?").get(req.params.id);
+            res.json({
+                success: true,
+                task: { ...updatedTask, is_running: false, tags: getTagsFor("task", req.params.id) },
+            });
         } else {
             res.status(400).json({ error: "No running timer" });
         }
@@ -518,49 +530,77 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
-// EXPANDED: Range Filtering for Efficiency Grid (Calendar)
-app.get("/api/history", (req, res) => {
+// NEW: Delete individual log
+app.delete("/api/history/:id", (req, res) => {
     try {
-        const { start, end, view } = req.query;
-        let query = `
-            SELECT l.id, l.start_time, l.end_time, l.rating, l.session_notes, l.manual_note, 
-                   t.title as task_title, t.color_hex, t.id as task_id
-            FROM time_logs l 
-            JOIN tasks t ON l.task_id = t.id 
-            WHERE l.end_time IS NOT NULL
-        `;
-        const params = [];
-
-        if (start && end) {
-            query += ` AND l.start_time >= ? AND l.start_time <= ?`;
-            params.push(start, end);
-        }
-
-        query += ` ORDER BY l.start_time DESC`;
-
-        // Only limit if no specific range is requested (for general history tab)
-        if (!start && !end) {
-            query += ` LIMIT 100`;
-        }
-
-        const logs = db.prepare(query).all(...params);
-
-        // Fetch tags for each log's task to support Sidebar Distribution (Pie Chart)
-        const enrichedLogs = logs.map((log) => ({ 
-            ...log, 
-            start_time: new Date(log.start_time).toISOString(), 
-            end_time: log.end_time ? new Date(log.end_time).toISOString() : null, 
+        // We also need to deduct this log's duration from the task's total_time_ms
+        const log = db.prepare("SELECT * FROM time_logs WHERE id = ?").get(req.params.id);
+        if (log && log.end_time) {
+            const duration = new Date(log.end_time).getTime() - new Date(log.start_time).getTime();
             
-            ags: getTagsFor("task", log.task_id) }));
-
-        res.json(enrichedLogs);
+            db.transaction(() => {
+                db.prepare("UPDATE tasks SET total_time_ms = total_time_ms - ? WHERE id = ?").run(duration, log.task_id);
+                db.prepare("DELETE FROM time_logs WHERE id = ?").run(req.params.id);
+            })();
+        } else {
+            // If it's a running log (active session), just delete it without time deduction
+            db.prepare("DELETE FROM time_logs WHERE id = ?").run(req.params.id);
+        }
+        res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
+app.post("/api/dev/generate-logs", (req, res) => {
+    try {
+        const { taskId, count } = req.body;
+        const now = new Date();
+        const logs = [];
+        
+        const insertLog = db.prepare("INSERT INTO time_logs (task_id, start_time, end_time, rating, manual_note) VALUES (?, ?, ?, ?, ?)");
+        const updateTask = db.prepare("UPDATE tasks SET total_time_ms = total_time_ms + ? WHERE id = ?");
 
+        db.transaction(() => {
+            for (let i = 0; i < count; i++) {
+                // Random day in current month
+                const day = Math.floor(Math.random() * 28) + 1;
+                // Random duration 15m to 4h
+                const durationMs = (Math.floor(Math.random() * 240) + 15) * 60 * 1000; 
+                
+                const start = new Date(now.getFullYear(), now.getMonth(), day, 9 + Math.floor(Math.random()*8), 0, 0);
+                const end = new Date(start.getTime() + durationMs);
+
+                insertLog.run(taskId, start.toISOString(), end.toISOString(), 3, "Auto-generated test log");
+                updateTask.run(durationMs, taskId);
+            }
+        })();
+        
+        res.json({ success: true, message: `Generated ${count} logs` });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// 4. HISTORY WITH FILTERING
+// Objective: Retrieve task logs with optional date range filtering for calendar view.
+// GET: History with Range Filtering
+app.get("/api/history", (req, res) => {
+    const { start, end } = req.query;
+    let sql = `SELECT l.*, t.title as task_title, t.color_hex FROM time_logs l JOIN tasks t ON l.task_id = t.id WHERE l.end_time IS NOT NULL`;
+    const params = [];
+    if (start && end) {
+        sql += ` AND l.start_time >= ? AND l.start_time <= ?`;
+        params.push(start, end);
+    }
+    sql += ` ORDER BY l.start_time DESC LIMIT 100`;
+    res.json(db.prepare(sql).all(...params));
+});
+
+// --- END OF API ROUTES ---
+
+
+
+// Start Server
 app.listen(PORT, "127.0.0.1", () => {
     console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);
-    dbService.init(USER_DATA_PATH);
+    // dbService.init(USER_DATA_PATH); // Ignored as per Q4 instruction
 });
