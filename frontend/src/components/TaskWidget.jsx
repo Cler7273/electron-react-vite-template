@@ -1,4 +1,3 @@
-// frontend/src/components/TaskWidget.jsx
 import React, { useState, useEffect, useRef } from "react";
 import Draggable from "react-draggable";
 import { ResizableBox } from "react-resizable";
@@ -20,89 +19,73 @@ const formatTime = (ms) => {
     return `${h}:${m}:${s}`;
 };
 
-const TaskWidget = ({ task: initialTask, scale = 1 }) => {
+const TaskWidget = ({ task, onUpdate }) => {
     const nodeRef = useRef(null);
 
     // --- STATE ---
-
-    const [totalElapsed, setTotalElapsed] = useState(0);
-    const [sessionElapsed, setSessionElapsed] = useState(0);
+    // We initialize state, but we also watch for prop changes below
+    const [localTask, setLocalTask] = useState(task);
+    const [isVisible, setIsVisible] = useState(task.is_running);
     const [noteDraft, setNoteDraft] = useState("");
 
-    const [localTask, setLocalTask] = useState(initialTask);
-    const [isVisible, setIsVisible] = useState(initialTask.is_running);
+    // Timer State
+    const [totalElapsed, setTotalElapsed] = useState(0);
+    const [sessionElapsed, setSessionElapsed] = useState(0);
 
+    // Random position only on first mount
     const [defaultPos] = useState({
         x: Math.random() * (window.innerWidth - 300) + 100,
         y: Math.random() * (window.innerHeight - 300) + 100,
     });
-    // PERSISTENCE: Check session on mount
+
+    // --- 1. REACTIVITY: Keep Local State in Sync with Props ---
     useEffect(() => {
-        const resume = async () => {
-            const active = await API.getActiveSession();
-            if (active && active.id === initialTask.id) {
-                setLocalTask((prev) => ({ ...prev, ...active, is_running: true }));
-                setIsVisible(true);
-            }
-        };
-        resume();
-    }, []);
-    // --- MISSION: DATA BINDING (Sync with Global System) ---
-    const fetchLatest = async () => {
-        try {
-            const data = await API.getTasks();
-            const updated = data.tasks.find((t) => t.id === localTask.id);
-            if (updated) {
-                // If it was started in the TasksApp, the widget detects it here and appears
-                if (updated.is_running && !localTask.is_running) {
-                    setIsVisible(true);
+        setLocalTask(task);
+        // If the prop says it's running, force visibility
+        if (task.is_running) setIsVisible(true);
+    }, [task]);
+
+    // --- 2. GLOBAL EVENT LISTENER (The "Remote Control") ---
+    useEffect(() => {
+        const handleSignals = async (e) => {
+            // A. Visibility Toggle Signal
+            if (e.type === "task:toggle-visibility") {
+                if (e.detail.taskId === localTask.id) {
+                    setIsVisible((prev) => !prev);
                 }
-                setLocalTask(updated);
             }
-        } catch (e) {
-            console.error("Widget sync failed", e);
-        }
-    };
-    useEffect(() => {
-        const checkGlobalPersistence = async () => {
-            try {
-                const active = await API.getActiveSession();
-                // If the DB says this specific task is running, force it visible
-                if (active && active.id === initialTask.id) {
-                    setLocalTask({ ...initialTask, ...active, is_running: true });
-                    setIsVisible(true);
+            // B. Data Update Signal (Re-fetch specific task to stay accurate)
+            else if (e.type === "cognicanvas:data-updated") {
+                try {
+                    const data = await API.getTasks();
+                    const updated = data.tasks.find((t) => t.id === localTask.id);
+
+                    if (!updated) {
+                        // Task was deleted from DB, hide myself
+                        setIsVisible(false);
+                        return;
+                    }
+
+                    setLocalTask(updated);
+                    if (updated.is_running && !localTask.is_running) {
+                        setIsVisible(true);
+                    }
+                } catch (err) {
+                    console.error("Widget sync error:", err);
                 }
-            } catch (e) {
-                console.error("Persistence check failed", e);
-            }
-        };
-        checkGlobalPersistence();
-    }, [initialTask.id]);
-
-    useEffect(() => {
-        // 1. Remote Data Sync
-        const handleRemote = () => fetchLatest();
-
-        // 2. Specific Show/Hide command from Dashboard
-        const handleToggleRequest = (e) => {
-            if (e.detail.taskId === localTask.id) {
-                setIsVisible((prev) => !prev);
             }
         };
 
-        window.addEventListener("cognicanvas:data-updated", handleRemote);
-        window.addEventListener("task:toggle-visibility", handleToggleRequest);
-
-        if (initialTask.is_running) setIsVisible(true);
-        setLocalTask(initialTask);
+        window.addEventListener("task:toggle-visibility", handleSignals);
+        window.addEventListener("cognicanvas:data-updated", handleSignals);
 
         return () => {
-            window.removeEventListener("cognicanvas:data-updated", handleRemote);
-            window.removeEventListener("task:toggle-visibility", handleToggleRequest);
+            window.removeEventListener("task:toggle-visibility", handleSignals);
+            window.removeEventListener("cognicanvas:data-updated", handleSignals);
         };
-    }, [initialTask.id]);
+    }, [localTask.id, localTask.is_running]);
 
-    // --- DUAL TIMER LOGIC ---
+    // --- 3. CLOCK LOGIC ---
     useEffect(() => {
         const updateClocks = () => {
             if (!localTask.is_running) {
@@ -115,111 +98,124 @@ const TaskWidget = ({ task: initialTask, scale = 1 }) => {
             const now = Date.now();
             const sessionDiff = Math.max(0, now - startTime);
 
+            // Current Session Time
             setSessionElapsed(sessionDiff);
+            // Total = Previous Total + Current Session
             setTotalElapsed((parseInt(localTask.total_time_ms) || 0) + sessionDiff);
         };
 
+        // Run immediately and then interval
         updateClocks();
         const interval = setInterval(updateClocks, 1000);
         return () => clearInterval(interval);
-    }, [localTask]);
+    }, [localTask.is_running, localTask.current_session_start, localTask.total_time_ms]);
 
     // --- ACTIONS ---
     const handleToggle = async (e) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent drag
         const action = localTask.is_running ? "stop" : "start";
 
         try {
-            // Note: stop returns the { success, task } object
-            const result = await API.toggleTask(localTask.id, action, {
-                manual_note: noteDraft,
-            });
+            const result = await API.toggleTask(localTask.id, action, { manual_note: noteDraft });
 
-            if (action === "stop" && result.task) {
-                setLocalTask(result.task); // Atomic Update
-                setNoteDraft("");
-                // We keep it visible so they can see the final time,
-                // but you can setIsVisible(false) if desired.
-            } else {
-                await fetchLatest();
+            if (action === "stop") {
+                setNoteDraft(""); // Clear note on stop
+                // Optional: Hide widget on stop?
+                // setIsVisible(false);
             }
 
-            // Notify other components (Dashboard)
+            // Broadcast update so TasksApp and other Widgets know
             window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+            if (onUpdate) onUpdate();
         } catch (err) {
-            // Handle 409 Conflict here if another task is running
             if (err.message.includes("already running")) {
                 alert("Another protocol is active. Please terminate it first.");
+            } else {
+                console.error(err);
             }
         }
     };
 
-    if (!localTask || !isVisible) return null;
-    // --- MISSION: VISUAL POLISH (Glassmorphism & Glow) ---
-    const glowStyle = localTask.is_running
-        ? {
-              boxShadow: `0 0 25px -5px ${localTask.color_hex || "#3b82f6"}88`,
-              border: `1px solid ${localTask.color_hex}aa`,
-          }
-        : {
-              border: `1px solid rgba(255,255,255,0.1)`,
-          };
+    if (!isVisible) return null;
+
+    // --- STYLES ---
+    const glowStyle = {
+        boxShadow: localTask.is_running ? `0 10px 30px -10px ${localTask.color_hex || "#3b82f6"}aa` : `0 4px 15px -5px rgba(0,0,0,0.5)`,
+        borderColor: localTask.is_running
+            ? `${localTask.color_hex}ff` // Full opacity when running
+            : `${localTask.color_hex}66`, // 40% opacity when idle
+        borderTopWidth: "4px", // Thicker top bar in task color
+    };
     return (
-        <Draggable nodeRef={nodeRef} scale={scale} handle=".widget-drag-handle" defaultPosition={defaultPos}>
-            <div ref={nodeRef} className="absolute z-50 group">
+        <Draggable nodeRef={nodeRef} handle=".drag-handle" defaultPosition={defaultPos}>
+            <div ref={nodeRef} className="absolute z-50 pointer-events-auto">
                 <ResizableBox
                     width={180}
-                    height={180}
-                    minConstraints={[150, 150]}
-                    maxConstraints={[500, 500]}
-                    resizeHandles={["se", "e", "s"]}
-                    className="rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl border border-white/20 flex flex-col transition-colors transition-opacity"
+                    height={170}
+                    minConstraints={[160, 160]}
+                    maxConstraints={[300, 300]}
+                    className="rounded-2xl backdrop-blur-md overflow-hidden transition-opacity ease-in-out transition-colors duration-300"
                     style={{
                         ...glowStyle,
-                        backgroundColor: localTask.color_hex ? `${localTask.color_hex}22` : "#111111CC",
-                        backgroundImage: `linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.4) 100%)`,
+                        backgroundColor: "#000000aa",
+                        borderWidth: "1px",
                     }}
                 >
-                    {/* DRAG HANDLE */}
-                    <div className="widget-drag-handle h-7 bg-black/30 cursor-move flex justify-between items-center px-3 shrink-0">
-                        <span className="text-[10px] font-black text-white/50 uppercase tracking-tighter">{localTask.is_running ? "● Active Session" : "Standby"}</span>
-                        <button onClick={() => setIsVisible(false)} className="text-white/40 hover:text-white font-bold">
-                            ×
-                        </button>
-                    </div>
-
-                    <div className="flex-1 flex flex-col p-3 min-h-0 text-white">
-                        {/* TASK TITLE */}
-                        <h4 className="text-center text-xs font-bold truncate mb-2 uppercase tracking-wide opacity-90">{localTask.title}</h4>
-
-                        {/* TIMER GRID */}
-                        <div className="flex-1 flex flex-col justify-center items-center gap-1 border-y border-white/10 py-2">
-                            {/* Main Display: Total Time */}
-                            <div className="flex flex-col items-center">
-                                <span className="text-[9px] uppercase font-bold text-white/40 mb-[-4px]">Accumulated</span>
-                                <span className="font-mono text-2xl font-black tracking-tight">{formatTime(totalElapsed)}</span>
+                    {/* FIX: Wrap everything in a single container div */}
+                    <div className="w-full h-full flex flex-col">
+                        {/* HEADER / DRAG HANDLE */}
+                        <div
+                            className="drag-handle h-9 cursor-move flex justify-between items-center px-3 border-b border-white/10 hover:brightness-125 transition-all shrink-0"
+                            style={{ backgroundColor: `${localTask.color_hex}33` }} // 20% tint of task color
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${localTask.is_running ? "animate-pulse" : ""}`} style={{ backgroundColor: localTask.color_hex }} />
+                                <span className="text-[10px] font-black text-white uppercase tracking-widest">{localTask.is_running ? "Running" : "Standby"}</span>
                             </div>
-
-                            {/* Sub Display: Session Time */}
-                            <div className="flex flex-col items-center opacity-80">
-                                <span className="text-[8px] uppercase font-bold text-white/40 mb-[-4px]">Current Session</span>
-                                <span className="font-mono text-sm font-bold text-green-400">{formatTime(sessionElapsed)}</span>
-                            </div>
-                        </div>
-
-                        {/* CONTROLS */}
-                        <div className="mt-3 space-y-2">
-                            {localTask.is_running && <input type="text" value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Log note..." onMouseDown={(e) => e.stopPropagation()} className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-white/30" />}
-                            <button
-                                onClick={handleToggle}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                className={`w-full py-2 rounded-xl text-[10px] font-black uppercase transition-colors transition-opacity transform active:scale-95
-                                    ${localTask.is_running ? "bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)]" : "bg-white text-black hover:bg-gray-200"}`}
-                            >
-                                {localTask.is_running ? "Terminate Session" : "Start Session"}
+                            <button onClick={() => setIsVisible(false)} className="text-gray-500 hover:text-white text-lg leading-none mb-1">
+                                &times;
                             </button>
                         </div>
-                    </div>
+
+                        {/* CONTENT */}
+                        <div className="flex-1 flex flex-col p-3 relative min-h-0">
+                            {/* TITLE */}
+                            <div className="text-center mb-2">
+                                <h4 className="text-white text-xs font-bold truncate px-1" title={localTask.title}>
+                                    {localTask.title}
+                                </h4>
+                            </div>
+
+                            {/* TIMERS */}
+                            <div className="flex-1 flex flex-col justify-center items-center">
+                                <div className="text-2xl font-mono font-bold text-white tracking-tight drop-shadow-md">{formatTime(totalElapsed)}</div>
+                                {localTask.is_running && <div className="text-[10px] font-mono text-green-400 mt-1 bg-green-900/20 px-2 rounded">Session: {formatTime(sessionElapsed)}</div>}
+                            </div>
+
+                            {/* CONTROLS */}
+                            <div className="mt-3 flex flex-col gap-2">
+                                {localTask.is_running && <input className="bg-black/50 border border-gray-700 rounded px-2 py-1 text-[10px] text-white focus:border-blue-500 outline-none w-full" placeholder="Session note..." value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onMouseDown={(e) => e.stopPropagation()} />}
+
+                                <button
+                                    onClick={handleToggle}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className={`w-full py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all duration-300
+        ${localTask.is_running ? "bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-600 hover:text-white" : "text-white shadow-lg hover:brightness-110 active:scale-95"}`}
+                                    style={
+                                        !localTask.is_running
+                                            ? {
+                                                  backgroundColor: localTask.color_hex,
+                                                  boxShadow: `0 4px 15px -2px ${localTask.color_hex}66`,
+                                              }
+                                            : {}
+                                    }
+                                >
+                                    {localTask.is_running ? "Terminate Session" : "Execute Protocol"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>{" "}
+                    {/* End of wrapper div */}
                 </ResizableBox>
             </div>
         </Draggable>

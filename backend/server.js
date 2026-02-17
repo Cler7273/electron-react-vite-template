@@ -9,7 +9,13 @@ const systemService = require("./services/system-service");
 
 const PORT = 4000;
 const app = express();
-
+// Helper: Safe Duration Calculator
+const getDuration = (start, end) => {
+    if (!start || !end) return 0;
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime();
+    return isNaN(s) || isNaN(e) ? 0 : e - s;
+};
 // Args handling
 const SECRET_TOKEN = process.argv[2];
 const USER_DATA_PATH = process.argv[3];
@@ -598,7 +604,39 @@ app.get("/api/history", (req, res) => {
 // --- END OF API ROUTES ---
 
 
+app.post("/api/dev/init-test", (req, res) => {
+    try {
+        const now = new Date();
+        const title = `TEST PROTOCOL ${now.getHours()}${now.getMinutes()}`;
+        
+        // 1. Create the Task
+        const taskInfo = db.prepare("INSERT INTO tasks (title, created_at, color_hex, is_done) VALUES (?, ?, ?, 0)").run(title, now.getTime(), "#ef4444");
+        const taskId = taskInfo.lastInsertRowid;
+        
+        let totalDuration = 0;
+        const insertLog = db.prepare("INSERT INTO time_logs (task_id, start_time, end_time, rating, manual_note) VALUES (?, ?, ?, ?, ?)");
+        
+        // 2. Generate 15 logs spread over the current month
+        db.transaction(() => {
+            for (let i = 1; i <= 15; i++) {
+                // Random day, random time
+                const day = (i % 28) + 1; 
+                const start = new Date(now.getFullYear(), now.getMonth(), day, 8 + (i%10), 0, 0);
+                const durationMinutes = 30 + (i * 10); // 40m, 50m, etc.
+                const end = new Date(start.getTime() + (durationMinutes * 60000));
+                
+                insertLog.run(taskId, start.toISOString(), end.toISOString(), 3, `Auto-gen log ${i}`);
+                totalDuration += (durationMinutes * 60000);
+            }
+            // 3. Update Task Total
+            db.prepare("UPDATE tasks SET total_time_ms = ? WHERE id = ?").run(totalDuration, taskId);
+        })();
 
+        res.json({ success: true, message: "Test Data Injected" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 // Start Server
 app.listen(PORT, "127.0.0.1", () => {
     console.log(`COGNICANVAS_BACKEND_READY on port ${PORT}`);

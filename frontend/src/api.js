@@ -10,7 +10,7 @@ export async function initializeApi() {
   }
 }
 
-async function apiFetch(endpoint, options = {}) {
+export async function apiFetch(endpoint, options = {}) {
   if (!SECRET_TOKEN) await initializeApi();
   
   // Fallback for development if token is still missing

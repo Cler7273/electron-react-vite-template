@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css"; // Basic styles for resizable handles
-import TaskWidget from "../components/TaskWidget";
 import * as API from "../api";
 import "../styles/calendar.css"; // Ensure you have basic calendar styles or Tailwind
 
@@ -49,6 +47,13 @@ const useTaskSystem = (setTasks, setLogs) => {
     };
 
     return { activeSession, refreshActive, handleStart, handleStop };
+};
+// Helper: Safe Duration Calculator
+const getDuration = (start, end) => {
+    if (!start || !end) return 0;
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime();
+    return isNaN(s) || isNaN(e) ? 0 : e - s;
 };
 const formatDate = (date) => new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const formatTime = (date) => new Date(date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -203,7 +208,10 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
         } else if (action === "delete") {
             if (confirm("Permanently delete?")) {
                 await API.deleteTask(task.id);
-                loadBaseData();
+                // OPTIMISTIC UPDATE: Remove immediately to kill the widget
+                setTasks((prev) => prev.filter((t) => t.id !== task.id));
+                // Then reload just in case
+                setTimeout(loadBaseData, 100);
             }
         }
     };
@@ -289,6 +297,21 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                     >
                         DEV
                     </button>
+                    <button
+                        onClick={async () => {
+                            await API.apiFetch("/dev/init-test", { method: "POST" });
+                            loadBaseData(); // Refresh tasks
+                            // Force refresh logs if in calendar view
+                            if (view === "calendar") {
+                                const d = new Date(selectedDate);
+                                setSelectedDate(new Date(d.getTime() + 1)); // Hack to trigger useEffect
+                            }
+                            alert("Test Data Generated");
+                        }}
+                        className="px-3 py-1 text-[9px] font-bold uppercase rounded text-purple-500 hover:bg-purple-900/20"
+                    >
+                        + Test Data
+                    </button>
                     {/* FIXED: CLOSE BUTTON NOW CALLS THE API */}
                     <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
                         ×
@@ -361,7 +384,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                         </div>
                                         <div className="space-y-2">
                                             <div className="flex gap-1 justify-between bg-black p-1 rounded border border-gray-800">
-                                                {NOTE_COLORS.slice(0, 5).map((hex) => (
+                                                {NOTE_COLORS.map((hex) => (
                                                     <button key={hex} onClick={() => handleUpdateColor(task.id, hex)} style={{ backgroundColor: hex }} className="w-4 h-4 rounded-full hover:scale-125 transition-transform" />
                                                 ))}
                                             </div>
@@ -403,23 +426,11 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                 className="flex items-center p-3 cursor-pointer select-none"
                             >
                                 <div className="w-1 h-8 rounded mr-3" style={{ backgroundColor: log.color_hex || "#555" }} />
-                                <button
-                                    onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if (confirm("Delete this specific session log? Time will be deducted.")) {
-                                            await API.deleteLog(log.id);
-                                            // Trigger reload
-                                            window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
-                                        }
-                                    }}
-                                    className="text-red-500 hover:text-red-400 text-[10px] uppercase font-bold border border-red-900/50 bg-red-900/10 px-3 rounded hover:bg-red-900/30 transition-colors"
-                                >
-                                    Delete Log
-                                </button>
+
                                 <div className="flex-1">
                                     <div className="flex justify-between items-center">
                                         <span className="font-bold text-gray-200 text-sm">{log.task_title}</span>
-                                        <span className="font-mono text-blue-400 text-xs">{formatDuration(log.end_time ? log.end_time - log.start_time : 0)}</span>
+                                        <span className="font-mono text-blue-400 text-xs">{formatDuration(getDuration(log.start_time, log.end_time))}</span>
                                     </div>
                                     <div className="flex justify-between items-center mt-1">
                                         <span className="text-[10px] text-gray-500 uppercase tracking-wider">{formatDate(log.start_time)}</span>
@@ -439,7 +450,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                             </div>
                                             <div>
                                                 <div className="text-gray-500 uppercase text-[9px] font-bold">Duration</div>
-                                                <div className="text-blue-400 font-mono text-sm">{formatDuration(log.end_time ? log.end_time - log.start_time : 0)}</div>
+                                                <div className="text-blue-400 font-mono text-sm">{formatDuration(getDuration(log.start_time, log.end_time))}</div>
                                             </div>
                                         </div>
                                         <div className="space-y-2 border-l border-gray-800 pl-4">
@@ -454,8 +465,8 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                         </div>
                                         <div className="col-span-2 pt-2 border-t border-gray-800/50">
                                             <div className="flex justify-between text-[9px] text-gray-500 uppercase font-bold">
-                                                <span>Day Start: {new Date(log.start_time).toLocaleDateString()} 00:00:00</span>
-                                                <span>Day End: {new Date(log.start_time).toLocaleDateString()} 23:59:59</span>
+                                                <span>Day Start: {new Date(log.start_time).toLocaleDateString()}</span>
+                                                <span>Day End: {new Date(log.start_time).toLocaleDateString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -468,6 +479,19 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                         </div>
                                         <button onClick={() => goToCalendarTime(log.start_time)} className="bg-blue-900/30 hover:bg-blue-800 text-blue-300 text-xs px-4 py-3 rounded border border-blue-900/50 transition-colors h-16 flex items-center">
                                             📅 Jump to Date
+                                        </button>
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (confirm("Delete this specific session log? Time will be deducted.")) {
+                                                    await API.deleteLog(log.id);
+                                                    // Trigger reload
+                                                    window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
+                                                }
+                                            }}
+                                            className="text-red-500 hover:text-red-400 text-[10px] uppercase font-bold border border-red-900/50 bg-red-900/10 px-3 rounded hover:bg-red-900/30 transition-colors"
+                                        >
+                                            Delete Log
                                         </button>
                                     </div>
                                 </div>
@@ -537,7 +561,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                 const d = new Date(l.start_time);
                 return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
             });
-            const monthTotalMs = monthLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+            const monthTotalMs = monthLogs.reduce((acc, l) => acc + getDuration(l.start_time, l.end_time), 0);
             return (
                 <div className="h-full flex flex-col bg-[#050505]">
                     <CalendarHeader />
@@ -562,7 +586,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                             const currentDate = new Date(year, month, d);
                             const dateStr = currentDate.toDateString();
                             const dayLogs = logs.filter((l) => new Date(l.start_time).toDateString() === dateStr);
-                            const totalMs = dayLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+                            const totalMs = dayLogs.reduce((acc, l) => acc + getDuration(l.start_time, l.end_time), 0);
 
                             return (
                                 <div
@@ -585,7 +609,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                         </div>
                                     )}
                                     <div className="px-1 py-1 bg-black/40 text-[10px] text-blue-400 font-mono flex justify-between">
-                                        <span>Total:{formatDuration(monthTotalMs)}</span>
+                                        <span>Total:{formatDuration(totalMs)}</span>
                                         <span className="font-bold -left-5"></span>
                                     </div>
                                 </div>
@@ -605,7 +629,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                     <div className="flex-1 grid grid-cols-3 gap-3 p-4 overflow-y-auto custom-scroll">
                         {months.map((_, i) => {
                             const monthLogs = logs.filter((l) => new Date(l.start_time).getFullYear() === year && new Date(l.start_time).getMonth() === i);
-                            const totalMs = monthLogs.reduce((acc, l) => acc + (l.end_time ? l.end_time - l.start_time : 0), 0);
+                            const totalMs = monthLogs.reduce((acc, l) => acc + getDuration(l.start_time, l.end_time), 0);
                             return (
                                 <div
                                     key={i}
@@ -660,10 +684,42 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
                                 </div>
 
                                 <div className="relative w-full" style={{ height: `${24 * 60 * zoomLevel}px` }}>
+                                    {/* Grid Lines */}
                                     {Array.from({ length: 24 }).map((_, i) => (
                                         <div key={i} className="border-b border-gray-800/10 w-full absolute" style={{ top: `${i * 60 * zoomLevel}px`, height: `${60 * zoomLevel}px` }} />
                                     ))}
-                                    {/* Logs... */}
+
+                                    {/* LOG BLOCKS */}
+                                    {dayLogs.map((log) => {
+                                        const start = new Date(log.start_time);
+                                        const end = log.end_time ? new Date(log.end_time) : new Date();
+
+                                        // Calculate position in minutes from midnight
+                                        const startMinutes = start.getHours() * 60 + start.getMinutes();
+                                        const durationMinutes = (end.getTime() - start.getTime()) / 60000;
+
+                                        return (
+                                            <div
+                                                key={log.id}
+                                                className="absolute left-1 right-1 rounded border overflow-hidden text-[9px] p-1 flex flex-col shadow-sm hover:z-50 hover:scale-[1.02] transition-all"
+                                                style={{
+                                                    top: `${startMinutes * zoomLevel}px`,
+                                                    height: `${Math.max(20, durationMinutes * zoomLevel)}px`, // Min height for visibility
+                                                    backgroundColor: `${log.color_hex || "#3b82f6"}33`, // 20% opacity
+                                                    borderColor: log.color_hex || "#3b82f6",
+                                                }}
+                                                onClick={() => {
+                                                    setExpandedLogId(log.id);
+                                                    setView("history"); // Jump to history details
+                                                }}
+                                            >
+                                                <span className="font-bold text-white truncate">{log.task_title}</span>
+                                                <span className="opacity-70">
+                                                    {formatTime(start)} - {formatTime(end)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         );
@@ -698,16 +754,7 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
         <div className="h-full w-full flex flex-col pt-10 overflow-visible relative">
             {/* Pill floats in the pt-10 zone */}
             {renderHeader()}
-            {tasks.map((task) => (
-                <TaskWidget
-                    key={task.id}
-                    task={task}
-                    // Pass the trigger to refresh main app when widget updates
-                    onUpdate={() => {
-                        window.dispatchEvent(new CustomEvent("cognicanvas:data-updated"));
-                    }}
-                />
-            ))}
+            
             {/* The Body uses flex-1 to fill the remaining HDWindowFrame space */}
             <div className="flex-1 flex flex-col bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl overflow-hidden relative">
                 {view === "dashboard" && renderDashboard()}
