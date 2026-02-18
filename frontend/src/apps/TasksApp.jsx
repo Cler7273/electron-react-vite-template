@@ -508,7 +508,9 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
         const CalendarHeader = () => (
             <div className="flex justify-between items-center px-4 py-3 bg-[#111] border-b border-gray-800 mt-12">
                 <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">{selectedDate.toLocaleString("default", { month: "long", year: "numeric" })}</h2>
+                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">{
+                    selectedDate.toLocaleString("default", { month: "long", year: "numeric" }) 
+                    }</h2>
                     <div className="flex bg-black rounded p-0.5 border border-gray-800">
                         {["year", "month", "week", "day"].map((m) => (
                             <button key={m} onClick={() => setCalendarMode(m)} className={`px-3 py-1 text-[10px] font-bold uppercase rounded transition-colors ${calendarMode === m ? "bg-gray-700 text-white" : "text-gray-500 hover:text-white"}`}>
