@@ -104,3 +104,5 @@ AFTER SOME IMPROVEMENTS, WE ARE NOW HERE
 *   **Tasks:** If tasks don't appear in HUD, verify `showTasks` prop in `Canvas.jsx` is true.
 
 THIS STATE IS COMPLEMENTARY AND DOESN'T OVERHAUL THE PREVIOUS UPGRADES TO BE DONE
+
+As of 18/2/26 finish on big guys and needed further devs are : Crypto app + HUD refinenement + documentation creation to create sustainably apps + gamification of time
