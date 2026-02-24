@@ -69,6 +69,8 @@ export const getHistory = (start, end) => {
 };
 // frontend/src/api.js
 export const deleteLog = (logId) => apiFetch(`/history/${logId}`, { method: 'DELETE' });
+export const updateManualNote = (logId, manual_note) => 
+    apiFetch(`/tasks/${logId}/update_manual_note`, { method: 'POST', body: JSON.stringify({ manual_note }) });
 export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
 export const startTask = (id) => apiFetch(`/tasks/${id}/start`, { method: 'POST' });
 export const stopTask = (id, body) => apiFetch(`/tasks/${id}/stop`, { method: 'POST', body: JSON.stringify(body) });

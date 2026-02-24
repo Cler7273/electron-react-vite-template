@@ -181,6 +181,13 @@ function App() {
                                 </HDWindowFrame>
                             </div>
                         )}
+                        {openApps.includes("checktask") && (
+                            <div className="pointer-events-auto">
+                                <HDWindowFrame title="Check Task" onDelete={() => toggleApp("checktask")} onClose={() => toggleApp("checktask")} initialPos={{ x: 50, y: 50 }} initialSize={{ width: 500, height: 700 }}>
+                                    <CheckTask windowAPI={windowAPI} />
+                                </HDWindowFrame>
+                            </div>
+                        )}
 
                         {/* CRYPTO APP WINDOW */}
                         {openApps.includes("crypto") && (

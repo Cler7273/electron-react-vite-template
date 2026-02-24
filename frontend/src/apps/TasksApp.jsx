@@ -226,7 +226,8 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
 
     const saveNote = async (logId) => {
         // Implement API call to save note for specific log
-        // console.log("Saving note:", noteDraft, " for log:", logId);
+        console.log("Saving note:", noteDraft, " for log:", logId);
+        await API.updateManualNote(logId, noteDraft);
         // await API.updateLog(logId, { manual_note: noteDraft });
         broadcastSync();
     };

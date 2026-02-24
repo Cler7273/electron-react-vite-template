@@ -71,7 +71,7 @@ const MIGRATIONS = [
         version: 2,
         up: `
             ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;
-            ALTER TABLE time_logs ADD COLUMN session_notes TEXT;
+            ALTER TABLE time_logs ADD COLUMN manual_note TEXT;
         `,
     },
     {
@@ -534,6 +534,15 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         }
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.post("/api/tasks/:id/:action", (req, res) => {
+    const { id, action } = req.params;
+    if (action === "update_manual_note") {
+        const { manual_note } = req.body;
+        db.prepare("UPDATE time_logs SET manual_note = ? WHERE id = ?").run(manual_note, id);
+        res.json({ success: true });
     }
 });
 // NEW: Delete individual log
