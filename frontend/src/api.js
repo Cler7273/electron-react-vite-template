@@ -1,5 +1,7 @@
 // frontend/src/api.js
 const API_URL = 'http://localhost:4000/api';
+
+
 let SECRET_TOKEN = null;
 
 export async function initializeApi() {
@@ -76,3 +78,34 @@ export const startTask = (id) => apiFetch(`/tasks/${id}/start`, { method: 'POST'
 export const stopTask = (id, body) => apiFetch(`/tasks/${id}/stop`, { method: 'POST', body: JSON.stringify(body) });
 export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' });
+
+// --- JOBS API ---
+export const getJobLists = () => apiFetch('/job-lists');
+export const createJobList = (data) => apiFetch('/job-lists', { method: 'POST', body: JSON.stringify(data) });
+export const deleteJobList = (id) => apiFetch(`/job-lists/${id}`, { method: 'DELETE' });
+
+export const getJobs = () => apiFetch('/jobs');
+export const createJob = (data) => apiFetch('/jobs', { method: 'POST', body: JSON.stringify(data) });
+export const updateJob = (id, data) => apiFetch(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const removeJob = (id) => apiFetch(`/jobs/${id}`, { method: 'DELETE' });
+// ==========================================
+// --- UNIVERSAL APP ENGINE (UAE) API ---
+// ==========================================
+
+// App Registry
+export const getUaeApps = () => apiFetch('/uae/apps');
+export const registerUaeApp = (data) => apiFetch('/uae/apps', { method: 'POST', body: JSON.stringify(data) });
+export const deleteUaeApp = (id) => apiFetch(`/uae/apps/${id}`, { method: 'DELETE' });
+
+// Generic Entities CRUD
+export const getUaeEntities = (appId, entityType) => 
+    apiFetch(`/uae/apps/${appId}/entities/${entityType}`);
+
+export const createUaeEntity = (appId, entityType, data) => 
+    apiFetch(`/uae/apps/${appId}/entities/${entityType}`, { method: 'POST', body: JSON.stringify(data) });
+
+export const updateUaeEntity = (entityId, data) => 
+    apiFetch(`/uae/entities/${entityId}`, { method: 'PUT', body: JSON.stringify(data) });
+
+export const deleteUaeEntity = (entityId) => 
+    apiFetch(`/uae/entities/${entityId}`, { method: 'DELETE' });

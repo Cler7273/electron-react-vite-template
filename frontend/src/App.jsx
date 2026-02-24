@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { initializeApi } from "./api";
 import Canvas from "./components/Canvas";
+import CheckTask from "./apps/CheckTask";
 import WindowFrame from "./components/WindowFrame";
 import CryptoApp from "./apps/CryptoApp";
 import TasksApp from "./apps/TasksApp";
@@ -8,6 +9,10 @@ import HDWindowFrame from "./components/HDWindowFrame";
 import ShortcutWidget from "./components/ShortcutWidget";
 import SettingsApp from "./apps/SettingsApp";
 import CommandPalette from "./components/CommandPalette";
+// --- ADD THESE NEW IMPORTS ---
+import { LinkSaverApp } from "./apps/LinkSaverApp";
+import { UaeLauncher } from "./apps/UaeLauncher";
+
 
 function App() {
     const [openApps, setOpenApps] = useState([]);
@@ -15,7 +20,9 @@ function App() {
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilters, setActiveFilters] = useState([]);
     const [availableTags, setAvailableTags] = useState([]);
-
+    const UAE_APPS_REGISTRY = [
+        { id: 'linksaver', name: 'LinkSaver', icon: '🔗', color: '#10b981', component: LinkSaverApp },
+    ];
     // Settings & Theme
     const [shortcuts, setShortcuts] = useState([]);
     const [theme, setTheme] = useState({ canvas_bg: "#242424" });
@@ -104,6 +111,12 @@ function App() {
                 <DockIcon label="Tasks" active={openApps.includes("tasks")} onClick={() => toggleApp("tasks")}>
                     ✅
                 </DockIcon>
+                <DockIcon label="Check Task" active={openApps.includes("checktask")} onClick={() => toggleApp("checktask")}>
+                    🎯
+                </DockIcon>
+                <DockIcon label="App Hub" active={openApps.includes("uaehub")} onClick={() => toggleApp("uaehub")}>
+                    🌌
+                </DockIcon>
                 <div className="flex-1" />
                 <DockIcon label="Settings" active={openApps.includes("settings")} onClick={() => toggleApp("settings")}>
                     ⚙️
@@ -184,7 +197,7 @@ function App() {
                         {openApps.includes("checktask") && (
                             <div className="pointer-events-auto">
                                 <HDWindowFrame title="Check Task" onDelete={() => toggleApp("checktask")} onClose={() => toggleApp("checktask")} initialPos={{ x: 50, y: 50 }} initialSize={{ width: 500, height: 700 }}>
-                                    <CheckTask windowAPI={windowAPI} />
+                                    <CheckTask windowAPI={window.nativeAPI} />
                                 </HDWindowFrame>
                             </div>
                         )}
@@ -206,6 +219,50 @@ function App() {
                                 </WindowFrame>
                             </div>
                         )}
+                        {/* UAE HUB WINDOW */}
+                        {openApps.includes("uaehub") && (
+                            <div className="pointer-events-auto">
+                                <HDWindowFrame title="Workspace Hub" onDelete={() => toggleApp("uaehub")} onClose={() => toggleApp("uaehub")} initialPos={{ x: 100, y: 100 }} initialSize={{ width: 750, height: 500 }}>
+                                    <UaeLauncher
+                                        apps={UAE_APPS_REGISTRY}
+                                        onLaunch={(appId) => {
+                                            // Open the requested app if it isn't already open
+                                            if (!openApps.includes(appId)) toggleApp(appId);
+                                        }}
+                                        windowAPI={window.nativeAPI}
+                                    />
+                                </HDWindowFrame>
+                            </div>
+                        )}
+                        {/* DYNAMIC UAE APPS WINDOWS */}
+                        {UAE_APPS_REGISTRY.map(app => {
+                            // Only render if the app is toggled open
+                            if (!openApps.includes(app.id)) return null;
+
+                            const AppComponent = app.component;
+
+                            return (
+                                <div key={app.id} className="pointer-events-auto">
+                                    <HDWindowFrame
+                                        title={app.name}
+                                        onDelete={() => toggleApp(app.id)}
+                                        onClose={() => toggleApp(app.id)}
+                                        dragHandleClass="custom-window-drag" // <--- CRITICAL: Matches the class in the Shell
+                                        initialPos={{ x: 150, y: 150 }}
+                                        initialSize={{ width: 700, height: 550 }}
+                                    >
+                                        {/* 
+                  We pass onHome={() => toggleApp(app.id)} so that clicking the 
+                  "Home" button in the UAE Shell cleanly closes the window. 
+                */}
+                                        <AppComponent
+                                            windowAPI={window.nativeAPI}
+                                            onHome={() => toggleApp(app.id)}
+                                        />
+                                    </HDWindowFrame>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

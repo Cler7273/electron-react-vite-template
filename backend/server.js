@@ -92,6 +92,55 @@ const MIGRATIONS = [
             UPDATE tasks SET is_done = 0 WHERE is_done IS NULL;
         `,
     },
+    // Add this object at the end of your MIGRATIONS array in backend/server.js
+    {
+        version: 6,
+        up: `
+            CREATE TABLE IF NOT EXISTS job_lists (
+                id TEXT PRIMARY KEY, 
+                title TEXT, 
+                type TEXT
+            );
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY, 
+                title TEXT, 
+                list_id TEXT, 
+                is_done BOOLEAN DEFAULT 0, 
+                created_at INTEGER, 
+                FOREIGN KEY (list_id) REFERENCES job_lists(id) ON DELETE CASCADE
+            );
+            -- Insert default system lists for jobs
+            INSERT OR IGNORE INTO job_lists (id, title, type) VALUES ('default', 'Mes jobs', 'system');
+            INSERT OR IGNORE INTO job_lists (id, title, type) VALUES ('starred', 'Suivis', 'system');
+        `,
+    },
+    {
+        version: 7,
+        up: `
+            -- App Registry: Stores the configuration, theme, and UI blueprint of custom apps
+            CREATE TABLE IF NOT EXISTS sys_apps (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                theme_color TEXT DEFAULT '#4f46e5',
+                blueprint TEXT DEFAULT '{}' 
+            );
+            
+            -- Universal Data Store: Stores ANY entity (lists, items, settings) for ANY app using JSON
+            CREATE TABLE IF NOT EXISTS sys_entities (
+                id TEXT PRIMARY KEY,
+                app_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                data TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER,
+                updated_at INTEGER,
+                FOREIGN KEY (app_id) REFERENCES sys_apps(id) ON DELETE CASCADE
+            );
+            
+            -- Indexes for fast querying based on app and type
+            CREATE INDEX IF NOT EXISTS idx_sys_entities_app ON sys_entities(app_id);
+            CREATE INDEX IF NOT EXISTS idx_sys_entities_type ON sys_entities(app_id, entity_type);
+        `,
+    },
 ];
 
 const runMigrations = () => {
@@ -205,6 +254,118 @@ app.get("/api/all", (req, res) => {
     res.json({ notes, frames, tasks });
 });
 
+// --- JOBS & JOB LISTS API ---
+app.get("/api/job-lists", (req, res) => {
+    try {
+        const lists = db.prepare("SELECT * FROM job_lists").all();
+        res.json(lists);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post("/api/job-lists", (req, res) => {
+    try {
+        const { id, title, type } = req.body;
+        db.prepare("INSERT INTO job_lists (id, title, type) VALUES (?, ?, ?)").run(id, title, type);
+        res.status(201).json({ id, title, type });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/job-lists/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM job_lists WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get("/api/jobs", (req, res) => {
+    try {
+        const jobs = db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all();
+        res.json(jobs);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Replace your POST /api/jobs in server.js with this hardened version
+app.post("/api/jobs", (req, res) => {
+    try {
+        const { id, title, list_id } = req.body;
+        const created_at = Date.now();
+        // Force list_id to string to match SQLite TEXT type
+        const safe_list_id = String(list_id); 
+        
+        db.prepare("INSERT INTO jobs (id, title, list_id, is_done, created_at) VALUES (?, ?, ?, 0, ?)").run(id, title, safe_list_id, created_at);
+        
+        // Return exactly what the DB has
+        res.status(201).json({ 
+            id: String(id), 
+            title, 
+            list_id: safe_list_id, 
+            is_done: 0, 
+            created_at 
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put("/api/jobs/:id", (req, res) => {
+    try {
+        // Now supports moving lists (list_id)
+        const { is_done, title, list_id } = req.body;
+        const updates = [];
+        const params = [];
+
+        if (is_done !== undefined) { updates.push("is_done = ?"); params.push(is_done ? 1 : 0); }
+        if (title !== undefined) { updates.push("title = ?"); params.push(title); }
+        if (list_id !== undefined) { updates.push("list_id = ?"); params.push(list_id); }
+
+        if (updates.length > 0) {
+            params.push(req.params.id);
+            db.prepare(`UPDATE jobs SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Rename a List
+app.put("/api/job-lists/:id", (req, res) => {
+    try {
+        const { title } = req.body;
+        db.prepare("UPDATE job_lists SET title = ? WHERE id = ?").run(title, req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Clear Completed Jobs in a List
+app.delete("/api/job-lists/:id/completed", (req, res) => {
+    try {
+        db.prepare("DELETE FROM jobs WHERE list_id = ? AND is_done = 1").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/jobs/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM jobs WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post("/api/notes", (req, res) => {
     const { content, pos_x, pos_y, width, height, color_hex } = req.body;
     const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
@@ -296,6 +457,93 @@ app.post("/api/tags/:itemType/:itemId", (req, res) => {
     })();
     res.status(201).json({ message: "Tag added" });
 });
+// Add this specifically - it's the one causing your 404 and 500 errors
+app.post("/api/uae/apps", (req, res) => {
+    try {
+        const { id, name, theme_color, blueprint } = req.body;
+        // This puts the app into sys_apps so the Foreign Key constraint is satisfied
+        db.prepare(`INSERT OR REPLACE INTO sys_apps (id, name, theme_color, blueprint) VALUES (?, ?, ?, ?)`)
+          .run(id, name, theme_color || '#4f46e5', JSON.stringify(blueprint || {}));
+        res.status(201).json({ id, name });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// 2. Create Universal Entities
+app.post("/api/uae/apps/:appId/entities/:entityType", (req, res) => {
+    try {
+        const { appId, entityType } = req.params;
+        const payload = req.body; // Can be anything!
+        
+        const entityId = payload.id || `ent_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const now = Date.now();
+        
+        // Ensure ID is not inside the JSON data to avoid duplication, though it's fine if it is.
+        if(payload.id) delete payload.id; 
+
+        db.prepare(`INSERT INTO sys_entities (id, app_id, entity_type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+          .run(entityId, appId, entityType, JSON.stringify(payload), now, now);
+          
+        res.status(201).json({ id: entityId, app_id: appId, entity_type: entityType, data: payload, created_at: now, updated_at: now });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Fetch Universal Entities
+app.get("/api/uae/apps/:appId/entities/:entityType", (req, res) => {
+    try {
+        const { appId, entityType } = req.params;
+        
+        const rows = db.prepare(`SELECT * FROM sys_entities WHERE app_id = ? AND entity_type = ? ORDER BY created_at DESC`)
+                       .all(appId, entityType);
+                       
+        const entities = rows.map(row => ({
+            id: row.id,
+            app_id: row.app_id,
+            entity_type: row.entity_type,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            ...JSON.parse(row.data) // Spread the JSON payload directly into the top level!
+        }));
+        
+        res.json(entities);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 4. Update & Delete Universal Entities
+app.put("/api/uae/entities/:id", (req, res) => {
+    try {
+        const entityId = req.params.id;
+        const updates = req.body; // Partial JSON update
+        const now = Date.now();
+        
+        const existing = db.prepare("SELECT data FROM sys_entities WHERE id = ?").get(entityId);
+        if (!existing) return res.status(404).json({ error: "Entity not found" });
+        
+        const currentData = JSON.parse(existing.data);
+        const mergedData = { ...currentData, ...updates }; // Merge properties
+        
+        db.prepare("UPDATE sys_entities SET data = ?, updated_at = ? WHERE id = ?")
+          .run(JSON.stringify(mergedData), now, entityId);
+          
+        res.json({ success: true, id: entityId, data: mergedData, updated_at: now });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/uae/entities/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM sys_entities WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
     const { itemType, itemId, tagName } = req.params;
