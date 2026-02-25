@@ -50,13 +50,24 @@
             "output": "release"
         },
         "win": {
-            "target": "nsis",
-            "publisherName": "YourName",
+            "icon": "assets/IconCogniCanvas.ico",
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "publisherName": "Dan",
             "verifyUpdateCodeSignature": false
         },
         "nsis": {
             "oneClick": false,
-            "allowToChangeInstallationDirectory": true
-        }
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "shortcutName": "CogniCanvas"
+        },
+        "asar": true
     }
 }

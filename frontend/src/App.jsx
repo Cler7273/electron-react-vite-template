@@ -113,9 +113,6 @@ function App() {
             {/* SIDEBAR DOCK */}
             <nav className="w-16 bg-black flex flex-col items-center py-4 space-y-4 z-[100] border-r border-white/10">
                 <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black text-xl mb-4">C</div>
-                <DockIcon label="Cryptor" active={openApps.includes("crypto")} onClick={() => toggleApp("crypto")}>
-                    🔒
-                </DockIcon>
                 <DockIcon label="Tasks" active={openApps.includes("tasks")} onClick={() => toggleApp("tasks")}>
                     ✅
                 </DockIcon>
@@ -212,7 +209,7 @@ function App() {
 
                         {/* CRYPTO APP WINDOW */}
                         {openApps.includes("crypto") && (
-                            <div className="pointer-events-auto">
+                            <div className="hidden pointer-events-auto">
                                 <WindowFrame title="NASM Cryptor 2.0" onClose={() => toggleApp("crypto")} width={600} initialPos={{ x: 150, y: 150 }}>
                                     <CryptoApp />
                                 </WindowFrame>
