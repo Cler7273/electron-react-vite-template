@@ -12,6 +12,7 @@ import CommandPalette from "./components/CommandPalette";
 // --- ADD THESE NEW IMPORTS ---
 import { LinkSaverApp } from "./apps/LinkSaverApp";
 import { UaeLauncher } from "./apps/UaeLauncher";
+import { CalculatorApp } from "./apps/CalculatorApp";
 
 
 function App() {
@@ -22,6 +23,13 @@ function App() {
     const [availableTags, setAvailableTags] = useState([]);
     const UAE_APPS_REGISTRY = [
         { id: 'linksaver', name: 'LinkSaver', icon: '🔗', color: '#10b981', component: LinkSaverApp },
+        {
+            id: 'calculator',
+            name: 'Calculator',
+            icon: '🔢',
+            color: '#f59e0b',
+            component: CalculatorApp
+        }
     ];
     // Settings & Theme
     const [shortcuts, setShortcuts] = useState([]);
