@@ -43,7 +43,10 @@
             "electron/",
             "backend/",
             "node_modules/",
-            "package.json"
+            "package.json",
+            "dist/**/*",
+            "server.js",
+            "backend/**/*"
         ],
         "directories": {
             "buildResources": "assets",
@@ -68,7 +71,14 @@
             "createDesktopShortcut": true,
             "shortcutName": "CogniCanvas"
         },
-        "asar": true
-    
+        "asar": true,
+        "asarUnpack": [
+            "backend/**/*",
+            "node_modules/**/*",
+            "node_modules/express/**/*",
+            "node_modules/better-sqlite3/**/*",
+            "node_modules/nedb-promises/**/*",
+            "node_modules/body-parser/**/*"
+        ]
     }
 }

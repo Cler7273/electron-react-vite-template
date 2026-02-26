@@ -1,0 +1,27 @@
+directories:
+  output: release
+  buildResources: assets
+appId: com.cognicanvas.app
+productName: CogniCanvas
+files:
+  - filter:
+      - frontend/dist/
+      - electron/
+      - backend/
+      - node_modules/
+      - package.json
+win:
+  icon: assets/IconCogniCanvas.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  publisherName: Dan
+  verifyUpdateCodeSignature: false
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: CogniCanvas
+asar: true
+electronVersion: 31.7.7

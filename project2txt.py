@@ -7,14 +7,20 @@ def generate_project_output():
     # Folders to completely ignore
     blacklist_dirs = {
         '.git', '__pycache__', 'node_modules', 'venv', 'env', 
-        '.idea', '.vscode', 'dist', 'build', "target", 'out', 'bin', 'obj',"logs","release_sure",".github"
+        '.idea', '.vscode', 'dist', 'build', "target",
+          'out', 'bin', 'obj',"logs","release_sure",".github",
+          "win-unpacked","linux-unpacked","mac-unpacked",
+          "release","release_nosure"
+
+    
     }
     
     # Files to completely ignore
     blacklist_files = {
         output_filename, 
         os.path.basename(__file__), # Ignored the script itself
-        '.DS_Store', 'package-lock.json', 'yarn.lock','react.svg','electron.svg',"vite.svg","README.md","tree.py","project2txt.py","TODO"
+        '.DS_Store', 'package-lock.json', 'yarn.lock','react.svg','electron.svg',"vite.svg","README.md","tree.py",
+        "project2txt.py","TODO"
     }
     
     # File extensions to ignore (binary files, images, etc.)

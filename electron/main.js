@@ -8,6 +8,7 @@ const crypto = require('crypto');
 
 const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
 let backendProcess = null;
+let serverProcess;
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -30,16 +31,20 @@ function createWindow() {
 }
 
 function startBackend() {
-  const backendPath = path.join(__dirname, '../backend/server.js');
+  // Use app.getAppPath() to find where the files are actually located
+  const baseDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked') // We will unpack the backend
+    : path.join(__dirname, '..');
+
+  const backendPath = path.join(baseDir, 'backend', 'server.js');
   const userDataPath = app.getPath('userData');
 
-  // FIXED: Use process.execPath (Electron) instead of 'node'
-  // FIXED: Add ELECTRON_RUN_AS_NODE environment variable
+  console.log('Starting backend at:', backendPath);
+
   backendProcess = spawn(process.execPath, [backendPath, SECRET_TOKEN, userDataPath], {
-    cwd: path.join(__dirname, '../backend'), 
-    env: { 
-      ...process.env, 
-      ELECTRON_RUN_AS_NODE: '1' 
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1'
     },
     stdio: 'inherit'
   });
@@ -56,7 +61,7 @@ app.whenReady().then(async () => {
     if (event.sender === mainWindow.webContents) return SECRET_TOKEN;
     return null;
   });
-  
+
   ipcMain.handle('dialog:open-file', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog();
     return canceled ? null : filePaths[0];

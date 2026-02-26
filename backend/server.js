@@ -37,8 +37,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// Database Initialization
-const db = new Database("cognicanvas.db");
+
+// The 3rd argument passed from main.js spawn: [backendPath, SECRET_TOKEN, userDataPath]
+const userDataPath = process.argv[3]; 
+
+const dbPath = userDataPath 
+  ? path.join(userDataPath, 'database.db') 
+  : './database.db';
+
+const db = new Database(dbPath);
 
 // Register Regex Function for Search
 db.function("regexp", (pattern, str) => {

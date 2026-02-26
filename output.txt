@@ -131,21 +131,43 @@ SOFTWARE.
             "electron/",
             "backend/",
             "node_modules/",
-            "package.json"
+            "package.json",
+            "dist/**/*",
+            "server.js",
+            "backend/**/*"
         ],
         "directories": {
             "buildResources": "assets",
             "output": "release"
         },
         "win": {
-            "target": "nsis",
-            "publisherName": "YourName",
+            "icon": "assets/IconCogniCanvas.ico",
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "publisherName": "Dan",
             "verifyUpdateCodeSignature": false
         },
         "nsis": {
             "oneClick": false,
-            "allowToChangeInstallationDirectory": true
-        }
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "shortcutName": "CogniCanvas"
+        },
+        "asar": true,
+        "asarUnpack": [
+            "backend/**/*",
+            "node_modules/**/*",
+            "node_modules/express/**/*",
+            "node_modules/better-sqlite3/**/*",
+            "node_modules/nedb-promises/**/*",
+            "node_modules/body-parser/**/*"
+        ]
     }
 }
 ```
@@ -427,8 +449,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// Database Initialization
-const db = new Database("cognicanvas.db");
+
+// The 3rd argument passed from main.js spawn: [backendPath, SECRET_TOKEN, userDataPath]
+const userDataPath = process.argv[3]; 
+
+const dbPath = userDataPath 
+  ? path.join(userDataPath, 'database.db') 
+  : './database.db';
+
+const db = new Database(dbPath);
 
 // Register Regex Function for Search
 db.function("regexp", (pattern, str) => {
@@ -461,7 +490,7 @@ const MIGRATIONS = [
         version: 2,
         up: `
             ALTER TABLE time_logs ADD COLUMN rating INTEGER DEFAULT 0;
-            ALTER TABLE time_logs ADD COLUMN session_notes TEXT;
+            ALTER TABLE time_logs ADD COLUMN manual_note TEXT;
         `,
     },
     {
@@ -480,6 +509,55 @@ const MIGRATIONS = [
         version: 5,
         up: `
             UPDATE tasks SET is_done = 0 WHERE is_done IS NULL;
+        `,
+    },
+    // Add this object at the end of your MIGRATIONS array in backend/server.js
+    {
+        version: 6,
+        up: `
+            CREATE TABLE IF NOT EXISTS job_lists (
+                id TEXT PRIMARY KEY, 
+                title TEXT, 
+                type TEXT
+            );
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY, 
+                title TEXT, 
+                list_id TEXT, 
+                is_done BOOLEAN DEFAULT 0, 
+                created_at INTEGER, 
+                FOREIGN KEY (list_id) REFERENCES job_lists(id) ON DELETE CASCADE
+            );
+            -- Insert default system lists for jobs
+            INSERT OR IGNORE INTO job_lists (id, title, type) VALUES ('default', 'Mes jobs', 'system');
+            INSERT OR IGNORE INTO job_lists (id, title, type) VALUES ('starred', 'Suivis', 'system');
+        `,
+    },
+    {
+        version: 7,
+        up: `
+            -- App Registry: Stores the configuration, theme, and UI blueprint of custom apps
+            CREATE TABLE IF NOT EXISTS sys_apps (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                theme_color TEXT DEFAULT '#4f46e5',
+                blueprint TEXT DEFAULT '{}' 
+            );
+            
+            -- Universal Data Store: Stores ANY entity (lists, items, settings) for ANY app using JSON
+            CREATE TABLE IF NOT EXISTS sys_entities (
+                id TEXT PRIMARY KEY,
+                app_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                data TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER,
+                updated_at INTEGER,
+                FOREIGN KEY (app_id) REFERENCES sys_apps(id) ON DELETE CASCADE
+            );
+            
+            -- Indexes for fast querying based on app and type
+            CREATE INDEX IF NOT EXISTS idx_sys_entities_app ON sys_entities(app_id);
+            CREATE INDEX IF NOT EXISTS idx_sys_entities_type ON sys_entities(app_id, entity_type);
         `,
     },
 ];
@@ -595,6 +673,118 @@ app.get("/api/all", (req, res) => {
     res.json({ notes, frames, tasks });
 });
 
+// --- JOBS & JOB LISTS API ---
+app.get("/api/job-lists", (req, res) => {
+    try {
+        const lists = db.prepare("SELECT * FROM job_lists").all();
+        res.json(lists);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post("/api/job-lists", (req, res) => {
+    try {
+        const { id, title, type } = req.body;
+        db.prepare("INSERT INTO job_lists (id, title, type) VALUES (?, ?, ?)").run(id, title, type);
+        res.status(201).json({ id, title, type });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/job-lists/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM job_lists WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get("/api/jobs", (req, res) => {
+    try {
+        const jobs = db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all();
+        res.json(jobs);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Replace your POST /api/jobs in server.js with this hardened version
+app.post("/api/jobs", (req, res) => {
+    try {
+        const { id, title, list_id } = req.body;
+        const created_at = Date.now();
+        // Force list_id to string to match SQLite TEXT type
+        const safe_list_id = String(list_id); 
+        
+        db.prepare("INSERT INTO jobs (id, title, list_id, is_done, created_at) VALUES (?, ?, ?, 0, ?)").run(id, title, safe_list_id, created_at);
+        
+        // Return exactly what the DB has
+        res.status(201).json({ 
+            id: String(id), 
+            title, 
+            list_id: safe_list_id, 
+            is_done: 0, 
+            created_at 
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put("/api/jobs/:id", (req, res) => {
+    try {
+        // Now supports moving lists (list_id)
+        const { is_done, title, list_id } = req.body;
+        const updates = [];
+        const params = [];
+
+        if (is_done !== undefined) { updates.push("is_done = ?"); params.push(is_done ? 1 : 0); }
+        if (title !== undefined) { updates.push("title = ?"); params.push(title); }
+        if (list_id !== undefined) { updates.push("list_id = ?"); params.push(list_id); }
+
+        if (updates.length > 0) {
+            params.push(req.params.id);
+            db.prepare(`UPDATE jobs SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Rename a List
+app.put("/api/job-lists/:id", (req, res) => {
+    try {
+        const { title } = req.body;
+        db.prepare("UPDATE job_lists SET title = ? WHERE id = ?").run(title, req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Clear Completed Jobs in a List
+app.delete("/api/job-lists/:id/completed", (req, res) => {
+    try {
+        db.prepare("DELETE FROM jobs WHERE list_id = ? AND is_done = 1").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/jobs/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM jobs WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post("/api/notes", (req, res) => {
     const { content, pos_x, pos_y, width, height, color_hex } = req.body;
     const info = db.prepare("INSERT INTO notes (content, pos_x, pos_y, width, height, color_hex) VALUES (?, ?, ?, ?, ?, ?)").run(content, pos_x, pos_y, width, height, color_hex);
@@ -686,6 +876,93 @@ app.post("/api/tags/:itemType/:itemId", (req, res) => {
     })();
     res.status(201).json({ message: "Tag added" });
 });
+// Add this specifically - it's the one causing your 404 and 500 errors
+app.post("/api/uae/apps", (req, res) => {
+    try {
+        const { id, name, theme_color, blueprint } = req.body;
+        // This puts the app into sys_apps so the Foreign Key constraint is satisfied
+        db.prepare(`INSERT OR REPLACE INTO sys_apps (id, name, theme_color, blueprint) VALUES (?, ?, ?, ?)`)
+          .run(id, name, theme_color || '#4f46e5', JSON.stringify(blueprint || {}));
+        res.status(201).json({ id, name });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// 2. Create Universal Entities
+app.post("/api/uae/apps/:appId/entities/:entityType", (req, res) => {
+    try {
+        const { appId, entityType } = req.params;
+        const payload = req.body; // Can be anything!
+        
+        const entityId = payload.id || `ent_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const now = Date.now();
+        
+        // Ensure ID is not inside the JSON data to avoid duplication, though it's fine if it is.
+        if(payload.id) delete payload.id; 
+
+        db.prepare(`INSERT INTO sys_entities (id, app_id, entity_type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+          .run(entityId, appId, entityType, JSON.stringify(payload), now, now);
+          
+        res.status(201).json({ id: entityId, app_id: appId, entity_type: entityType, data: payload, created_at: now, updated_at: now });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Fetch Universal Entities
+app.get("/api/uae/apps/:appId/entities/:entityType", (req, res) => {
+    try {
+        const { appId, entityType } = req.params;
+        
+        const rows = db.prepare(`SELECT * FROM sys_entities WHERE app_id = ? AND entity_type = ? ORDER BY created_at DESC`)
+                       .all(appId, entityType);
+                       
+        const entities = rows.map(row => ({
+            id: row.id,
+            app_id: row.app_id,
+            entity_type: row.entity_type,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            ...JSON.parse(row.data) // Spread the JSON payload directly into the top level!
+        }));
+        
+        res.json(entities);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 4. Update & Delete Universal Entities
+app.put("/api/uae/entities/:id", (req, res) => {
+    try {
+        const entityId = req.params.id;
+        const updates = req.body; // Partial JSON update
+        const now = Date.now();
+        
+        const existing = db.prepare("SELECT data FROM sys_entities WHERE id = ?").get(entityId);
+        if (!existing) return res.status(404).json({ error: "Entity not found" });
+        
+        const currentData = JSON.parse(existing.data);
+        const mergedData = { ...currentData, ...updates }; // Merge properties
+        
+        db.prepare("UPDATE sys_entities SET data = ?, updated_at = ? WHERE id = ?")
+          .run(JSON.stringify(mergedData), now, entityId);
+          
+        res.json({ success: true, id: entityId, data: mergedData, updated_at: now });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete("/api/uae/entities/:id", (req, res) => {
+    try {
+        db.prepare("DELETE FROM sys_entities WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 app.delete("/api/:itemType/:itemId/tags/:tagName", (req, res) => {
     const { itemType, itemId, tagName } = req.params;
@@ -924,6 +1201,15 @@ app.post("/api/tasks/:id/stop", (req, res) => {
         }
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.post("/api/tasks/:id/:action", (req, res) => {
+    const { id, action } = req.params;
+    if (action === "update_manual_note") {
+        const { manual_note } = req.body;
+        db.prepare("UPDATE time_logs SET manual_note = ? WHERE id = ?").run(manual_note, id);
+        res.json({ success: true });
     }
 });
 // NEW: Delete individual log
@@ -1678,6 +1964,7 @@ const crypto = require('crypto');
 
 const SECRET_TOKEN = crypto.randomBytes(32).toString('hex');
 let backendProcess = null;
+let serverProcess;
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -1700,16 +1987,20 @@ function createWindow() {
 }
 
 function startBackend() {
-  const backendPath = path.join(__dirname, '../backend/server.js');
+  // Use app.getAppPath() to find where the files are actually located
+  const baseDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked') // We will unpack the backend
+    : path.join(__dirname, '..');
+
+  const backendPath = path.join(baseDir, 'backend', 'server.js');
   const userDataPath = app.getPath('userData');
 
-  // FIXED: Use process.execPath (Electron) instead of 'node'
-  // FIXED: Add ELECTRON_RUN_AS_NODE environment variable
+  console.log('Starting backend at:', backendPath);
+
   backendProcess = spawn(process.execPath, [backendPath, SECRET_TOKEN, userDataPath], {
-    cwd: path.join(__dirname, '../backend'), 
-    env: { 
-      ...process.env, 
-      ELECTRON_RUN_AS_NODE: '1' 
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1'
     },
     stdio: 'inherit'
   });
@@ -1726,7 +2017,7 @@ app.whenReady().then(async () => {
     if (event.sender === mainWindow.webContents) return SECRET_TOKEN;
     return null;
   });
-  
+
   ipcMain.handle('dialog:open-file', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog();
     return canceled ? null : filePaths[0];
@@ -1816,6 +2107,690 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+```
+
+```md
+// frontend\appPath.md
+# Workspace OS: The Official Developer Manual
+## Chapter 1: The UAE Ecosystem & App Philosophy
+
+Welcome to the Universal App Engine (UAE) Developer Manual. You have successfully built a "God Mode" operating system ecosystem. This manual will guide you through the exact pipeline for designing, implementing, and deploying new micro-apps into your OS in record time.
+
+### 1.1 What is the Universal App Engine (UAE)?
+In traditional development, adding a new app (like a Notes app or a Contact manager) requires a tedious, multi-step process: designing SQL tables, writing database migrations, creating Express CRUD routes, building frontend API wrappers, and finally creating the React UI. 
+
+The **UAE bypasses the backend entirely**. It uses a "Zero-Backend" paradigm powered by SQLite's JSON capabilities:
+*   **`sys_apps` (The Registry):** A single database table that tracks every app installed in your OS, along with its name and theme color.
+*   **`sys_entities` (The Universal Data Store):** A single table that stores *any* data for *any* app as parsed JSON. Whether you are saving a "Bookmark", a "Recipe", or a "Contact", it all goes here safely and is automatically indexed.
+
+Because of this architecture, **creating a new app in your OS is now strictly a Frontend UI task.**
+
+### 1.2 The Core Pillars of the OS
+To build apps efficiently, you must understand the 4 pillars that make your OS function:
+
+1.  **The Engine Hook (`useAppEngine.js`)**
+    This custom React hook is the brain of your app. By simply calling `useAppEngine('my_app', config, 'item')`, it automatically registers your app on the backend, fetches your saved JSON data, and provides you with `addEntity`, `updateEntity`, and `removeEntity` functions that feature built-in Optimistic UI updating.
+2.  **The Shell (`UniversalComponents.jsx`)**
+    The `UniversalAppShell` component guarantees that every app you build looks like a native OS window. It provides the dark-mode background, the draggable Header Pill (with dynamic drag handles), the Home/Close buttons, and the responsive Sidebar/Main Content layout.
+3.  **The App Hub (`UaeLauncher.jsx`)**
+    The visual "Desktop" of your OS. It scans a local registry and generates beautiful, glowing icons based on your app's theme color. 
+4.  **The Master Registry (`App.jsx`)**
+    The single source of truth that dictates which apps exist, which icons they use, and handles the logic for opening them as draggable `HDWindowFrame` instances on top of your canvas.
+
+### 1.3 The "Zero-Backend" App Pipeline
+When you decide to build a new application, the pipeline is always exactly **3 steps**:
+
+*   **Step 1: The UI Component:** Create a single `.jsx` file in `src/apps/` (e.g., `MyNewApp.jsx`). Inside, you will call `useAppEngine`, define your data mapping, and wrap it all in the `UniversalAppShell`.
+*   **Step 2: The Registry Entry:** Open `App.jsx`, import your new component, and add exactly *one line* to the `UAE_APPS_REGISTRY` array.
+*   **Step 3: Launch:** Refresh your browser. Your app is now live in the App Hub, ready to be clicked, dragged, and populated with data.
+
+### 1.4 Directory Architecture
+To maintain a clean OS, respect this file structure when creating new modules:
+
+```text
+frontend/
+├── src/
+│   ├── api.js                     # (Do not touch) Universal fetch wrappers
+│   ├── App.jsx                    # (Touch once per app) The OS Window Manager & Registry
+│   ├── components/
+│   │   └── UniversalComponents.jsx# (Do not touch) The OS Shell and standardized UI blocks
+│   ├── hooks/
+│   │   └── useAppEngine.js        # (Do not touch) The data synchronizer
+│   └── apps/                      # 📍 THIS IS YOUR PLAYGROUND
+│       ├── CheckTask.jsx          # Legacy standalone app
+│       ├── LinkSaverApp.jsx       # Standard UAE App
+│       ├── UaeLauncher.jsx        # The App Hub
+│       └── [YourNewApp].jsx       # <-- Where your new creations go
+```
+
+---
+
+**Summary of Chapter 1:**
+You now understand the philosophy of your OS. You are no longer writing full-stack code; you are simply defining UI views that plug into a universal data grid. 
+
+*Ready to build? Let me know when you want **Chapter 2**, where we will go step-by-step through creating the boilerplate for a brand-new App file!*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 2: The Boilerplate (Creating Your First App)
+
+Now that you understand the "Zero-Backend" philosophy of the Universal App Engine (UAE), it is time to build a new application. In this chapter, we will create the foundational boilerplate—the skeleton that every new app in your OS will use.
+
+### Step 1: Create the File
+Navigate to your `frontend/src/apps/` directory and create a new file. Name it according to what your app does (e.g., `RecipeBookApp.jsx`, `ContactsApp.jsx`, or `InventoryApp.jsx`).
+
+For this guide, we will refer to it as `MyNewApp.jsx`.
+
+### Step 2: The Essential Imports
+Every UAE app requires exactly three imports to function. Open your new file and add the following at the top:
+
+```javascript
+import React, { useState } from 'react';
+// 1. The Data Engine (Handles all DB saving/loading automatically)
+import { useAppEngine } from '../hooks/useAppEngine';
+// 2. The UI Shell (Handles the window, drag pill, dark mode, and layout)
+import { UniversalAppShell } from '../components/UniversalComponents';
+```
+
+### Step 3: Define the Component Signature
+Your app must be exported as a functional React component. To communicate perfectly with the OS Window Manager (`HDWindowFrame`), it must accept two specific props: `windowAPI` and `onHome`.
+
+```javascript
+export const MyNewApp = ({ windowAPI, onHome }) => {
+    // App logic will go here
+};
+```
+*   `windowAPI`: Allows the app's "Close (X)" button and drag handle to control the window.
+*   `onHome`: Allows the app's "Home" button to return the user to the App Hub without crashing.
+
+### Step 4: Awaken the Engine
+Inside your component, call the `useAppEngine` hook. This single line of code is what replaces hours of backend development. 
+
+```javascript
+    const { 
+        data: items,       // Your array of saved JSON objects
+        isLoading,         // Boolean to show loading spinners
+        addEntity,         // Function to save new data
+        updateEntity,      // Function to edit existing data
+        removeEntity       // Function to delete data
+    } = useAppEngine(
+        'app_mynewapp',                                // 1. Unique App ID (must be unique across the OS)
+        { name: 'My New App', themeColor: '#ec4899' }, // 2. App Config (Name and Hex Color for the UI)
+        'record'                                       // 3. Entity Type (e.g., 'contact', 'recipe', 'note')
+    );
+```
+
+### Step 5: Setup the UI Layout Slots
+The `UniversalAppShell` expects you to provide it with two main pieces of UI: The **Sidebar** and the **Main Content**. It is best practice to define these as variables before returning them.
+
+```javascript
+    // Define what goes in the left panel
+    const SidebarContent = (
+        <div className="p-4 text-gray-500 text-sm">
+            <h3>Menu</h3>
+            {/* Sidebar buttons/filters go here */}
+        </div>
+    );
+
+    // Define what goes in the center screen
+    const MainContent = (
+        <div className="max-w-3xl mx-auto text-gray-200">
+            <h2>Welcome to my app!</h2>
+            {/* Inputs and Lists go here */}
+        </div>
+    );
+```
+
+### Step 6: Return the Universal Shell
+Finally, wrap everything in the `UniversalAppShell`. Pass down your configurations and slots.
+
+```javascript
+    return (
+        <UniversalAppShell
+            appName="My New App"     // The title in the top bar
+            themeColor="#ec4899"     // The glowing color of the pill
+            windowAPI={windowAPI}    // Pass down the window controller
+            onHome={onHome}          // Pass down the home button controller
+            sidebarContent={SidebarContent} // Inject the sidebar
+        >
+            {MainContent}            {/* Inject the main content */}
+        </UniversalAppShell>
+    );
+```
+
+---
+
+### The Complete Copy-Paste Boilerplate
+Whenever you want to make a new app, simply copy this code into a new file and change the names and colors:
+
+```javascript
+import React, { useState } from 'react';
+import { useAppEngine } from '../hooks/useAppEngine';
+import { UniversalAppShell, UaeInput, UaeListItem } from '../components/UniversalComponents';
+
+export const MyNewApp = ({ windowAPI, onHome }) => {
+    // 1. Initialize Backend Engine
+    const { data: items, isLoading, addEntity, updateEntity, removeEntity } = useAppEngine(
+        'app_mynewapp', 
+        { name: 'My New App', themeColor: '#ec4899' }, 
+        'record' 
+    );
+
+    // 2. UI Slots
+    const SidebarContent = (
+        <div className="p-4 text-gray-500 text-sm">
+            Sidebar Menu
+        </div>
+    );
+
+    const MainContent = (
+        <div className="max-w-3xl mx-auto">
+            {isLoading ? <p className="text-gray-500">Loading...</p> : <p className="text-gray-200">Main Content Area</p>}
+        </div>
+    );
+
+    // 3. Render Shell
+    return (
+        <UniversalAppShell
+            appName="My New App"
+            themeColor="#ec4899"
+            windowAPI={windowAPI}
+            onHome={onHome}
+            sidebarContent={SidebarContent}
+        >
+            {MainContent}
+        </UniversalAppShell>
+    );
+};
+```
+
+---
+
+**Summary of Chapter 2:**
+You now have a fully functional, database-connected, beautifully styled application skeleton. It does nothing yet, but it is ready to be injected into the OS.
+
+*Ready for **Chapter 3**? We will cover how to register this boilerplate in the `App.jsx` Registry so it appears as a clickable, glowing icon in your OS App Hub! Let me know when you're ready.*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 3: Registering Your App (The OS Kernel)
+
+In Chapter 2, you created the source code for your app (`MyNewApp.jsx`). However, if you look at your OS right now, it is invisible. The Operating System Kernel (`App.jsx`) does not yet know this application exists.
+
+In this chapter, we will register your new app into the **Universal Registry**. This single step will automatically:
+1.  Add your app to the **App Hub (Launcher)** with a glowing icon.
+2.  Configure the **Window Manager** to handle its opening and closing.
+3.  Assign it a unique process ID for the OS to track.
+
+### Step 1: Open the Kernel
+Navigate to `frontend/src/App.jsx`. This is the brain of your frontend. It manages the desktop, the dock, and the window layering system.
+
+### Step 2: Import Your Component
+At the top of the file, alongside the other app imports, import the component you created in Chapter 2.
+
+```javascript
+// frontend/src/App.jsx
+
+import { LinkSaverApp } from "./apps/LinkSaverApp";
+import { UaeLauncher } from "./apps/UaeLauncher";
+// ADD YOUR IMPORT HERE:
+import { MyNewApp } from "./apps/MyNewApp"; 
+```
+
+### Step 3: Update the Registry
+Scroll down slightly to find the `const UAE_APPS_REGISTRY = [...]` array. This array is the "DNS" of your operating system. It tells the OS how to render the icon and which component to launch.
+
+Add a new object to this array for your app:
+
+```javascript
+const UAE_APPS_REGISTRY = [
+    { 
+        id: 'linksaver', 
+        name: 'LinkSaver', 
+        icon: '🔗', 
+        color: '#10b981', 
+        component: LinkSaverApp 
+    },
+    // ADD THIS NEW BLOCK:
+    { 
+        id: 'mynewapp',        // Unique System ID (Internal)
+        name: 'My New App',    // Display Name (Launcher Title)
+        icon: '🚀',            // Emoji or SVG Icon
+        color: '#ec4899',      // Theme Color (Matches your App Shell color)
+        component: MyNewApp    // The React Component to render
+    }
+];
+```
+
+### Step 4: The Magic of Dynamic Rendering
+You might be wondering: *"Do I need to scroll down and add an `<HDWindowFrame>` tag manually?"*
+
+**No.**
+
+Because of the Universal App Engine architecture we implemented, `App.jsx` contains a dynamic map loop:
+
+```javascript
+{UAE_APPS_REGISTRY.map(app => {
+    // ... logic checks if app is open ...
+    return (
+        <HDWindowFrame ... >
+             <AppComponent ... />
+        </HDWindowFrame>
+    )
+})}
+```
+
+By simply adding your object to the array, the OS dynamically generates the window logic, z-indexing, close handlers, and drag behaviors for you.
+
+### Step 5: Verify the Installation
+1.  Save `App.jsx`.
+2.  Refresh your browser.
+3.  Click the **App Hub (Galaxy Icon 🌌)** in the Sidebar Dock.
+4.  **Look for your icon:** You should see a Rocket Ship (🚀) icon glowing in Pink (`#ec4899`).
+5.  **Click it:** A new window titled "My New App" should float onto your canvas.
+
+---
+
+### Troubleshooting Registration
+*   **Icon not appearing?** Ensure you saved `App.jsx` and that the `UAE_APPS_REGISTRY` array syntax is valid (watch for missing commas).
+*   **Window opens but is blank?** Check `MyNewApp.jsx`. Ensure you are returning the `UniversalAppShell` and not just `null`.
+*   **Window opens but closes immediately?** Ensure your `toggleApp` ID matches the `id` in the registry. The Registry `id` ('mynewapp') is what the system uses to track open/closed state.
+
+---
+
+**Summary of Chapter 3:**
+Your app is now "Installed". It lives in the App Hub, it has a window, and it has a drag handle. But currently, it displays empty content. 
+
+*Ready for **Chapter 4**? We will deep-dive into the **Data Layer**, learning how to use `addEntity` to actually save user input into the SQLite database without writing any backend code.*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 4: The Data Layer (CRUD Mastery)
+
+Your app is now installed and visible, but it is currently a "ghost"—it has no memory. In this chapter, you will learn how to use the **Data Engine** to save, read, and delete information. 
+
+Because we are using the Universal App Engine (UAE), you will not write any SQL. Instead, you will work with **JSON Entities**.
+
+### 4.1 Understanding the Entity
+When you initialized your hook in Chapter 2, you defined an `entityType` (e.g., `'record'`). 
+Every time you save data, the OS creates a "box" in the database. Inside that box, you can put **any valid JavaScript object**. 
+
+If you save `{ "name": "John", "age": 30 }`, the database stores it exactly like that. If later you decide to add `{ "favorite_color": "blue" }`, you don't need to "migrate" the database. You just save it.
+
+### 4.2 Creating Data (`addEntity`)
+To save data, you use the `addEntity` function. It expects an object containing the data you want to persist.
+
+**Example: Adding a simple note**
+```javascript
+const handleSave = async (text) => {
+    await addEntity({
+        content: text,
+        category: "Work",
+        priority: 1
+    });
+};
+```
+**Why this is "God Mode":**
+*   **Auto-ID:** The engine automatically generates a unique ID for the item.
+*   **Auto-Timestamps:** The engine adds `created_at` and `updated_at` timestamps automatically.
+*   **Optimistic UI:** The item appears in your UI **instantly** (before the server even responds), making your OS feel lightning-fast.
+
+### 4.3 Reading Data (`data` & `isLoading`)
+The hook provides a `data` array. This array is **reactive**—whenever you add or delete something, this array updates automatically, triggering a React re-render.
+
+```javascript
+const MainContent = (
+    <div>
+        {isLoading ? (
+            <p>Chargement...</p> 
+        ) : (
+            items.map(item => (
+                <div key={item.id}>
+                    {item.content} {/* Accessing the properties you saved */}
+                </div>
+            ))
+        )}
+    </div>
+);
+```
+
+### 4.4 Deleting Data (`removeEntity`)
+Deleting is the simplest operation. You only need the `id` of the entity you want to destroy.
+
+```javascript
+<button onClick={() => removeEntity(item.id)}>
+    Supprimer
+</button>
+```
+The Engine will instantly remove the item from the `data` array (Optimistic UI) and then send the DELETE request to the backend in the background.
+
+### 4.5 Updating Data (`updateEntity`)
+Updating allows you to change specific properties of an existing entity without overwriting the whole thing.
+
+**Example: Marking a job as "Done"**
+```javascript
+const toggleComplete = (item) => {
+    updateEntity(item.id, { 
+        is_done: !item.is_done 
+    });
+};
+```
+The Engine merges your new data (`is_done`) with the existing JSON stored in the database.
+
+---
+
+### Pro-Tip: The `UaeInput` Shortcut
+To make data entry consistent across your OS, use the `UaeInput` component we built in `UniversalComponents.jsx`. It handles the styling and the "Enter" key logic for you.
+
+```javascript
+// Inside your MainContent:
+<UaeInput 
+    value={inputValue}
+    onChange={setInputValue}
+    onSubmit={(value) => addEntity({ title: value })}
+    placeholder="Ajouter quelque chose..."
+    icon="➕"
+/>
+```
+
+---
+
+**Summary of Chapter 4:**
+You are now a Full-Stack developer without writing a single line of backend code. You can Create, Read, Update, and Delete data using simple JavaScript objects.
+
+*Ready for **Chapter 5**? We will explore the **UI Components Library**, learning how to use `UaeListItem` to create professional, interactive lists that match the OS aesthetic. Let me know when you're ready!*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 5: UI Standard Library (UaeListItem & Layouts)
+
+An Operating System is only as good as its consistency. If every app had different buttons and list styles, the Workspace OS would feel like a collection of random websites. 
+
+In this chapter, we will master the **Standard UI Library** (`UniversalComponents.jsx`). We will focus specifically on the `UaeListItem`, the core building block for displaying data professionally.
+
+---
+
+### 5.1 The `UaeListItem` Component
+The `UaeListItem` is a pre-styled "row" component. It handles hover effects, layout, and spacing so you don't have to write Tailwind classes for every item.
+
+#### Basic Usage:
+```javascript
+<UaeListItem 
+    title="Nom de l'élément"
+    subtitle="Description ou URL"
+    onClick={() => console.log("Cliqué !")}
+/>
+```
+
+#### The 5 Essential Props:
+1.  **`title` (String):** The primary text (rendered in bold, light gray).
+2.  **`subtitle` (String):** Optional secondary text (rendered in smaller, dark gray).
+3.  **`isActive` (Boolean):** If `true`, the item glows with your theme color (perfect for selected folders).
+4.  **`onClick` (Function):** The action triggered when the whole row is clicked.
+5.  **`actions` (JSX):** A slot for buttons (Delete, Edit, Star) that **only appear when the user hovers** over the item.
+
+---
+
+### 5.2 Mastering the `actions` Slot
+The `actions` slot is where you put your control buttons. Because this slot is wrapped in a `group-hover` container, your UI stays clean and "minimalist" until the user actually needs to interact with an item.
+
+**CRITICAL RULE:** When placing buttons in the `actions` slot, you **must** use `e.stopPropagation()`. If you don't, clicking the "Delete" button will also trigger the row's `onClick` (e.g., opening a link).
+
+```javascript
+actions={
+    <div className="flex gap-1">
+        <button 
+            onClick={(e) => {
+                e.stopPropagation(); // Prevents row click
+                removeEntity(item.id);
+            }}
+            className="p-1 hover:bg-red-900/30 text-gray-500 hover:text-red-500 rounded transition-colors"
+        >
+            🗑️
+        </button>
+    </div>
+}
+```
+
+---
+
+### 5.3 Selection & Active States
+To make your app feel "native," you should highlight the item currently being viewed. Use the `isActive` prop combined with your `useState`.
+
+```javascript
+const [selectedId, setSelectedId] = useState(null);
+
+// Inside your map loop:
+{items.map(item => (
+    <UaeListItem
+        key={item.id}
+        title={item.name}
+        isActive={selectedId === item.id}
+        onClick={() => setSelectedId(item.id)}
+    />
+))}
+```
+
+---
+
+### 5.4 Standard Layout Pattern
+A professional UAE app follows this specific layout structure inside the `MainContent` area:
+
+1.  **Header/Input Area:** Fixed at the top.
+2.  **Scrollable List:** Occupying the remaining space.
+3.  **Empty State:** Shown when the list is zero.
+
+```javascript
+const MainContent = (
+    <div className="flex flex-col h-full">
+        {/* 1. INPUT */}
+        <UaeInput ... />
+
+        {/* 2. LIST */}
+        <div className="flex-1 space-y-2 mt-4">
+            {items.length > 0 ? (
+                items.map(item => (
+                    <UaeListItem ... />
+                ))
+            ) : (
+                /* 3. EMPTY STATE */
+                <div className="text-center py-20 text-gray-600 text-sm">
+                    Aucun élément trouvé.
+                </div>
+            )}
+        </div>
+    </div>
+);
+```
+
+---
+
+### 5.5 Visual Tips for OS Aesthetic
+*   **Emojis:** Use emojis as icons in your titles or sidebar. They provide color without requiring extra assets.
+*   **Monospace for Data:** For IDs, prices, or dates, use the `font-mono` class to make them look "system-native."
+*   **Glow Effects:** If an item is critical, wrap it in a `shadow-[0_0_15px_rgba(var(--theme-rgb),0.2)]` for a subtle ambient glow.
+
+---
+
+**Summary of Chapter 5:**
+You now have the tools to build UIs that are indistinguishable from the core OS apps. By using `UaeListItem`, you ensure that your apps are fast, accessible, and beautiful.
+
+*Ready for **Chapter 6**? we will tackle **Sidebars & Categorization**—learning how to filter your data and create folder systems like we did in LinkSaver. Let me know when you're ready!*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 6: Sidebars & Dynamic Categorization
+
+In this chapter, we move beyond simple lists and learn how to organize massive amounts of data. Professional apps don't just show one long list; they use **Categories** (Folders) to filter content.
+
+Because our backend is "Zero-Backend," we don't use database tables for folders. Instead, we use **Dynamic Extraction** from the JSON data.
+
+---
+
+### 6.1 The Logic: Filtering by Category
+To implement folders, you need a "Filter" state. This state dictates which items are visible in the `MainContent`.
+
+```javascript
+// 1. Define the active filter state
+const [activeCategory, setActiveCategory] = useState("General");
+
+// 2. Filter your data array BEFORE mapping it in the JSX
+const filteredItems = items.filter(item => item.category === activeCategory);
+```
+
+### 6.2 Dynamic Category Extraction
+Instead of hardcoding a list of folders, we look at the data we have saved and "discover" which categories exist. We use `useMemo` for this to ensure high performance.
+
+```javascript
+const categories = useMemo(() => {
+    // A 'Set' ensures that even if 100 items are in "Work", the folder only appears once.
+    const cats = new Set(["General"]); 
+    
+    items.forEach(item => {
+        if (item.category) cats.add(item.category);
+    });
+    
+    return Array.from(cats);
+}, [items]);
+```
+
+### 6.3 Implementing the Sidebar UI
+The Sidebar is where the user switches between these categories. You should use a consistent style: an icon, the folder name, and an optional "Counter" showing how many items are inside.
+
+```javascript
+const SidebarContent = (
+    <div className="p-4 space-y-2">
+        <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Dossiers</h3>
+        {categories.map(cat => {
+            const count = items.filter(i => i.category === cat).length;
+            const isActive = activeCategory === cat;
+
+            return (
+                <div 
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`flex justify-between items-center px-3 py-2 rounded-lg cursor-pointer transition-all text-sm
+                        ${isActive ? 'bg-indigo-900/30 text-indigo-400 border border-indigo-800' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                >
+                    <span>📁 {cat}</span>
+                    {count > 0 && <span className="text-[10px] bg-black px-1.5 py-0.5 rounded text-gray-600">{count}</span>}
+                </div>
+            );
+        })}
+    </div>
+);
+```
+
+### 6.4 The "Empty Folder" Problem
+As we discovered during the LinkSaver development, if a folder has **zero** items, it won't be "discovered" by the `useMemo` logic and will disappear from the sidebar. 
+
+To fix this, we maintain a `customCategories` state for folders the user just created but hasn't put items into yet.
+
+```javascript
+const [customCategories, setCustomCategories] = useState([]);
+
+// Update useMemo to include them:
+const categories = useMemo(() => {
+    const cats = new Set(["General", ...customCategories]);
+    items.forEach(item => item.category && cats.add(item.category));
+    return Array.from(cats);
+}, [items, customCategories]);
+```
+
+### 6.5 Saving Items into the Active Folder
+When the user adds a new item using `addEntity`, you must ensure the `activeCategory` is included in the payload. This "wires" the item to the current folder.
+
+```javascript
+const handleAddItem = async (text) => {
+    await addEntity({
+        title: text,
+        category: activeCategory, // <--- This ensures it appears in the right folder!
+        is_done: 0
+    });
+};
+```
+
+---
+
+### Summary of Chapter 6
+You have now implemented a self-organizing file system. 
+1. The **Sidebar** lists all categories found in your data.
+2. Clicking a category sets the **Filter**.
+3. The **MainContent** only renders items matching that filter.
+4. New items **inherit** the category of the folder you are currently in.
+
+---
+
+**Summary of Chapter 6:**
+You have mastered data architecture. Your apps can now handle hundreds of items while remaining perfectly organized. 
+
+*Ready for **Chapter 7 (The Finale)**? We will cover **App Polish, Modals, and The Launch Sequence**—the final steps to move from a prototype to a polished OS tool. Let me know when you're ready!*
+
+# Workspace OS: The Official Developer Manual
+## Chapter 7: The Finale (Polish & The Launch Sequence)
+
+Congratulations. You have reached the final chapter. You have transitioned from a single-app developer to an Operating System Architect. In this finale, we cover the "Last Mile"—the polish that separates a functional script from a premium OS tool.
+
+---
+
+### 7.1 The "Anti-Crash" Modal System
+As established in our development journey, **`prompt()` is prohibited** in the Workspace OS environment. It freezes the main thread and crashes the window manager. To maintain "Zero-Crash" stability, every app must use the **React-State Modal Pattern**.
+
+**The Blueprint for a Professional Modal:**
+```javascript
+const [modal, setModal] = useState({ isOpen: false, title: "", value: "", action: null });
+
+// To trigger it:
+setModal({
+    isOpen: true,
+    title: "Changer le nom",
+    value: item.name,
+    action: (newValue) => updateEntity(item.id, { name: newValue })
+});
+```
+*   **Visual Rule:** Always use `backdrop-blur-sm` on the overlay to give the user a sense of "focus" on the dialog while keeping the app visible in the background.
+
+---
+
+### 7.2 Visual Consistency (Theme Syncing)
+To make an app feel "Native," the **Theme Color** must breathe through the entire interface. Do not just set it in the Registry; use it inside your app’s UI components.
+
+*   **Glowing Inputs:** Match your `UaeInput` focus ring to your theme color.
+*   **Active States:** Ensure your sidebar selection and progress bars use the same hex code.
+*   **The Ambient Glow:** Use a low-opacity background glow for the active category:
+    `style={{ backgroundColor: `${themeColor}22`, borderColor: themeColor }}` (where `22` is the hex for 13% opacity).
+
+---
+
+### 7.3 UX: The Loading & Empty States
+Users hate "jumping" interfaces. Use the `isLoading` property provided by the Engine to show a professional placeholder.
+
+*   **Skeleton Loading:** Instead of a blank screen, show 3 or 4 `UaeListItem` components with empty titles and a `pulse` animation.
+*   **The "Zero-Data" Illustration:** When `items.length === 0`, always provide an emoji and a clear "Call to Action" (e.g., *"Cliquez sur + pour commencer"*).
+
+---
+
+### 7.4 The Final Deployment Checklist
+Before you consider an app "Production Ready" in your OS, run through this 5-point checklist:
+
+1.  **Registry Alignment:** Does the `id` in `App.jsx` match the `appId` in `useAppEngine`?
+2.  **Home Connector:** Is the `onHome` prop passed from `App.jsx` -> `MyApp.jsx` -> `UniversalAppShell`? (This prevents the user from getting "trapped" in an app).
+3.  **Drag Stability:** Does the Header Pill contain the `custom-window-drag` class on the Grip element?
+4.  **Propagations:** Do all buttons in the `actions` slot of your list items have `e.stopPropagation()`?
+5.  **Cleanup:** Did you remove all `console.log` and debug buttons used during construction?
+
+---
+
+### 7.5 Final Words: Infinite Expansion
+You now possess a **Universal App Engine**. This is not just a framework; it is a factory. 
+
+Because you built the **Universal Data Store (`sys_entities`)**, your database will never become cluttered with hundreds of tables. Your backend will stay slim and fast, while your frontend can grow to support dozens of apps:
+*   *Need a Password Manager?* Just define a `secret` entity type.
+*   *Need a Workout Tracker?* Just define a `session` entity type.
+*   *Need a Budget Tool?* Just define a `transaction` entity type.
+
+The OS is no longer a static piece of software—it is a living workspace that evolves at the speed of your imagination.
+
+**System Status: ALL SYSTEMS GO.**
+**The Manual is Complete.**
+
+*Happy Coding, Architect. Your Workspace is ready.*
+
 ```
 
 ```js
@@ -1965,6 +2940,8 @@ export default defineConfig({
 // frontend\src\api.js
 // frontend/src/api.js
 const API_URL = 'http://localhost:4000/api';
+
+
 let SECRET_TOKEN = null;
 
 export async function initializeApi() {
@@ -2034,11 +3011,44 @@ export const getHistory = (start, end) => {
 };
 // frontend/src/api.js
 export const deleteLog = (logId) => apiFetch(`/history/${logId}`, { method: 'DELETE' });
+export const updateManualNote = (logId, manual_note) => 
+    apiFetch(`/tasks/${logId}/update_manual_note`, { method: 'POST', body: JSON.stringify({ manual_note }) });
 export const createTask = (title) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
 export const startTask = (id) => apiFetch(`/tasks/${id}/start`, { method: 'POST' });
 export const stopTask = (id, body) => apiFetch(`/tasks/${id}/stop`, { method: 'POST', body: JSON.stringify(body) });
 export const updateTask = (id, data) => apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' });
+
+// --- JOBS API ---
+export const getJobLists = () => apiFetch('/job-lists');
+export const createJobList = (data) => apiFetch('/job-lists', { method: 'POST', body: JSON.stringify(data) });
+export const deleteJobList = (id) => apiFetch(`/job-lists/${id}`, { method: 'DELETE' });
+
+export const getJobs = () => apiFetch('/jobs');
+export const createJob = (data) => apiFetch('/jobs', { method: 'POST', body: JSON.stringify(data) });
+export const updateJob = (id, data) => apiFetch(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const removeJob = (id) => apiFetch(`/jobs/${id}`, { method: 'DELETE' });
+// ==========================================
+// --- UNIVERSAL APP ENGINE (UAE) API ---
+// ==========================================
+
+// App Registry
+export const getUaeApps = () => apiFetch('/uae/apps');
+export const registerUaeApp = (data) => apiFetch('/uae/apps', { method: 'POST', body: JSON.stringify(data) });
+export const deleteUaeApp = (id) => apiFetch(`/uae/apps/${id}`, { method: 'DELETE' });
+
+// Generic Entities CRUD
+export const getUaeEntities = (appId, entityType) => 
+    apiFetch(`/uae/apps/${appId}/entities/${entityType}`);
+
+export const createUaeEntity = (appId, entityType, data) => 
+    apiFetch(`/uae/apps/${appId}/entities/${entityType}`, { method: 'POST', body: JSON.stringify(data) });
+
+export const updateUaeEntity = (entityId, data) => 
+    apiFetch(`/uae/entities/${entityId}`, { method: 'PUT', body: JSON.stringify(data) });
+
+export const deleteUaeEntity = (entityId) => 
+    apiFetch(`/uae/entities/${entityId}`, { method: 'DELETE' });
 ```
 
 ```jsx
@@ -2046,6 +3056,7 @@ export const deleteTask = (id) => apiFetch(`/tasks/${id}`, { method: 'DELETE' })
 import React, { useState, useEffect } from "react";
 import { initializeApi } from "./api";
 import Canvas from "./components/Canvas";
+import CheckTask from "./apps/CheckTask";
 import WindowFrame from "./components/WindowFrame";
 import CryptoApp from "./apps/CryptoApp";
 import TasksApp from "./apps/TasksApp";
@@ -2053,6 +3064,11 @@ import HDWindowFrame from "./components/HDWindowFrame";
 import ShortcutWidget from "./components/ShortcutWidget";
 import SettingsApp from "./apps/SettingsApp";
 import CommandPalette from "./components/CommandPalette";
+// --- ADD THESE NEW IMPORTS ---
+import { LinkSaverApp } from "./apps/LinkSaverApp";
+import { UaeLauncher } from "./apps/UaeLauncher";
+import { CalculatorApp } from "./apps/CalculatorApp";
+
 
 function App() {
     const [openApps, setOpenApps] = useState([]);
@@ -2060,7 +3076,16 @@ function App() {
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilters, setActiveFilters] = useState([]);
     const [availableTags, setAvailableTags] = useState([]);
-
+    const UAE_APPS_REGISTRY = [
+        { id: 'linksaver', name: 'LinkSaver', icon: '🔗', color: '#10b981', component: LinkSaverApp },
+        {
+            id: 'calculator',
+            name: 'Calculator',
+            icon: '🔢',
+            color: '#f59e0b',
+            component: CalculatorApp
+        }
+    ];
     // Settings & Theme
     const [shortcuts, setShortcuts] = useState([]);
     const [theme, setTheme] = useState({ canvas_bg: "#242424" });
@@ -2143,11 +3168,14 @@ function App() {
             {/* SIDEBAR DOCK */}
             <nav className="w-16 bg-black flex flex-col items-center py-4 space-y-4 z-[100] border-r border-white/10">
                 <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black text-xl mb-4">C</div>
-                <DockIcon label="Cryptor" active={openApps.includes("crypto")} onClick={() => toggleApp("crypto")}>
-                    🔒
-                </DockIcon>
                 <DockIcon label="Tasks" active={openApps.includes("tasks")} onClick={() => toggleApp("tasks")}>
                     ✅
+                </DockIcon>
+                <DockIcon label="Check Task" active={openApps.includes("checktask")} onClick={() => toggleApp("checktask")}>
+                    🎯
+                </DockIcon>
+                <DockIcon label="App Hub" active={openApps.includes("uaehub")} onClick={() => toggleApp("uaehub")}>
+                    🌌
                 </DockIcon>
                 <div className="flex-1" />
                 <DockIcon label="Settings" active={openApps.includes("settings")} onClick={() => toggleApp("settings")}>
@@ -2226,10 +3254,17 @@ function App() {
                                 </HDWindowFrame>
                             </div>
                         )}
+                        {openApps.includes("checktask") && (
+                            <div className="pointer-events-auto">
+                                <HDWindowFrame title="Check Task" onDelete={() => toggleApp("checktask")} onClose={() => toggleApp("checktask")} initialPos={{ x: 50, y: 50 }} initialSize={{ width: 500, height: 700 }}>
+                                    <CheckTask windowAPI={window.nativeAPI} />
+                                </HDWindowFrame>
+                            </div>
+                        )}
 
                         {/* CRYPTO APP WINDOW */}
                         {openApps.includes("crypto") && (
-                            <div className="pointer-events-auto">
+                            <div className="hidden pointer-events-auto">
                                 <WindowFrame title="NASM Cryptor 2.0" onClose={() => toggleApp("crypto")} width={600} initialPos={{ x: 150, y: 150 }}>
                                     <CryptoApp />
                                 </WindowFrame>
@@ -2244,6 +3279,50 @@ function App() {
                                 </WindowFrame>
                             </div>
                         )}
+                        {/* UAE HUB WINDOW */}
+                        {openApps.includes("uaehub") && (
+                            <div className="pointer-events-auto">
+                                <HDWindowFrame title="Workspace Hub" onDelete={() => toggleApp("uaehub")} onClose={() => toggleApp("uaehub")} initialPos={{ x: 100, y: 100 }} initialSize={{ width: 750, height: 500 }}>
+                                    <UaeLauncher
+                                        apps={UAE_APPS_REGISTRY}
+                                        onLaunch={(appId) => {
+                                            // Open the requested app if it isn't already open
+                                            if (!openApps.includes(appId)) toggleApp(appId);
+                                        }}
+                                        windowAPI={window.nativeAPI}
+                                    />
+                                </HDWindowFrame>
+                            </div>
+                        )}
+                        {/* DYNAMIC UAE APPS WINDOWS */}
+                        {UAE_APPS_REGISTRY.map(app => {
+                            // Only render if the app is toggled open
+                            if (!openApps.includes(app.id)) return null;
+
+                            const AppComponent = app.component;
+
+                            return (
+                                <div key={app.id} className="pointer-events-auto">
+                                    <HDWindowFrame
+                                        title={app.name}
+                                        onDelete={() => toggleApp(app.id)}
+                                        onClose={() => toggleApp(app.id)}
+                                        dragHandleClass="custom-window-drag" // <--- CRITICAL: Matches the class in the Shell
+                                        initialPos={{ x: 150, y: 150 }}
+                                        initialSize={{ width: 700, height: 550 }}
+                                    >
+                                        {/* 
+                  We pass onHome={() => toggleApp(app.id)} so that clicking the 
+                  "Home" button in the UAE Shell cleanly closes the window. 
+                */}
+                                        <AppComponent
+                                            windowAPI={window.nativeAPI}
+                                            onHome={() => toggleApp(app.id)}
+                                        />
+                                    </HDWindowFrame>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -2264,6 +3343,50 @@ const DockIcon = ({ children, label, onClick, active }) => (
 );
 
 export default App;
+```
+
+```jsx
+// frontend\src\Desktop.jsx
+import React, { useState } from 'react';
+import CheckTask from './CheckTask'; // Adjust path
+import { LinkSaverApp } from './apps/LinkSaverApp'; // Adjust path
+import { UaeLauncher } from './apps/UaeLauncher';
+
+// Local React Component Registry
+const APPS_REGISTRY = [
+    { id: 'checktask', name: 'CheckTask', icon: '✅', color: '#3b82f6', component: CheckTask },
+    { id: 'linksaver', name: 'LinkSaver', icon: '🔗', color: '#10b981', component: LinkSaverApp },
+    // Want a new app tomorrow? Just add ONE line here!
+    // { id: 'notes', name: 'Notes', icon: '📝', color: '#f59e0b', component: NotesApp }
+];
+
+export const Desktop = ({ windowAPI }) => {
+    // null = show Launcher. string = show specific App.
+    const [activeAppId, setActiveAppId] = useState(null);
+
+    // If an app is selected, render it
+    if (activeAppId) {
+        const AppTarget = APPS_REGISTRY.find(a => a.id === activeAppId);
+        if (!AppTarget) return null;
+        
+        const AppComponent = AppTarget.component;
+        return (
+            <AppComponent 
+                windowAPI={windowAPI} 
+                onHome={() => setActiveAppId(null)} // Pass the exit function
+            />
+        );
+    }
+
+    // Otherwise, render the Desktop Launcher
+    return (
+        <UaeLauncher 
+            apps={APPS_REGISTRY} 
+            onLaunch={(id) => setActiveAppId(id)}
+            windowAPI={windowAPI}
+        />
+    );
+};
 ```
 
 ```css
@@ -2402,6 +3525,784 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+```
+
+```jsx
+// frontend\src\apps\CalculatorApp.jsx
+import React, { useState } from 'react';
+import { useAppEngine } from '../hooks/useAppEngine';
+import { UniversalAppShell, UaeListItem } from '../components/UniversalComponents';
+
+export const CalculatorApp = ({ windowAPI, onHome }) => {
+    // 1. Initialize Engine for "History" tracking
+    const { data: history, addEntity, removeEntity, isLoading } = useAppEngine(
+        'app_calculator',
+        { name: 'Calculator', themeColor: '#f59e0b' },
+        'calculation'
+    );
+
+    const [display, setDisplay] = useState('0');
+    const [equation, setEquation] = useState('');
+
+    // 2. Calculator Logic
+    const handleNumber = (num) => {
+        setDisplay(prev => prev === '0' ? String(num) : prev + num);
+    };
+
+    const handleOperator = (op) => {
+        if (display === 'Error') return; // Don't allow operators on an error
+        setEquation(display + ' ' + op + ' ');
+        setDisplay('0');
+    };
+
+    const calculate = async () => {
+        if (!equation) return;
+
+        const fullExpr = equation + display;
+        let result;
+
+        try {
+            // --- SAFE MATH PARSER REPLACING EVAL ---
+            // 1. Split the string (e.g., "12 + 5" -> ["12", "+", "5"])
+            const parts = fullExpr.trim().split(' ');
+            const num1 = parseFloat(parts[0]);
+            const operator = parts[1];
+            const num2 = parseFloat(parts[2]);
+
+            // 2. Perform the logic based on the operator
+            switch (operator) {
+                case '+': result = num1 + num2; break;
+                case '-': result = num1 - num2; break;
+                case '*': result = num1 * num2; break;
+                case '/': result = num2 !== 0 ? num1 / num2 : "Infinity"; break;
+                default: throw new Error("Unknown Operator");
+            }
+            // ---------------------------------------
+
+            if (result === "Infinity") throw new Error("Div by Zero");
+
+            setDisplay(String(result));
+            setEquation('');
+
+            // Save to History (Background Task)
+            addEntity({
+                expression: fullExpr,
+                result: String(result),
+                timestamp: new Date().toLocaleTimeString()
+            }).catch(e => console.error("OS Log: History save failed", e));
+
+        } catch (err) {
+            setDisplay('Error');
+            setEquation('');
+        }
+    };
+
+    const clear = () => {
+        setDisplay('0');
+        setEquation('');
+    };
+
+    // 3. UI Slots
+    const SidebarContent = (
+        <div className="p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">History</h3>
+            <div className="flex-1 overflow-y-auto space-y-2">
+                {history.map(item => (
+                    <UaeListItem
+                        key={item.id}
+                        title={item.result}
+                        subtitle={item.expression}
+                        actions={
+                            <button onClick={(e) => { e.stopPropagation(); removeEntity(item.id); }} className="text-xs opacity-50 hover:opacity-100">🗑️</button>
+                        }
+                        onClick={() => setDisplay(item.result)}
+                    />
+                ))}
+                {history.length === 0 && <p className="text-gray-600 text-xs italic">No history yet</p>}
+            </div>
+        </div>
+    );
+
+    const MainContent = (
+        <div className="max-w-xs mx-auto mt-10 p-4 bg-black/40 rounded-2xl border border-white/5 shadow-2xl">
+            {/* Display */}
+            <div className="text-right mb-4 p-4 bg-black/60 rounded-xl border border-white/5">
+                <div className="text-gray-500 text-xs h-4">{equation}</div>
+                <div className="text-white text-4xl font-light truncate">{display}</div>
+            </div>
+
+            {/* Grid */}
+            <div className="grid grid-cols-4 gap-2">
+                <button onClick={clear} className="col-span-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-white rounded-lg transition-colors">AC</button>
+                <button onClick={() => handleOperator('/')} className="p-4 bg-amber-600/20 text-amber-500 hover:bg-amber-600/40 rounded-lg font-bold">÷</button>
+
+                {[7, 8, 9].map(n => <button key={n} onClick={() => handleNumber(n)} className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-lg">{n}</button>)}
+                <button onClick={() => handleOperator('*')} className="p-4 bg-amber-600/20 text-amber-500 hover:bg-amber-600/40 rounded-lg font-bold">×</button>
+
+                {[4, 5, 6].map(n => <button key={n} onClick={() => handleNumber(n)} className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-lg">{n}</button>)}
+                <button onClick={() => handleOperator('-')} className="p-4 bg-amber-600/20 text-amber-500 hover:bg-amber-600/40 rounded-lg font-bold">-</button>
+
+                {[1, 2, 3].map(n => <button key={n} onClick={() => handleNumber(n)} className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-lg">{n}</button>)}
+                <button onClick={() => handleOperator('+')} className="p-4 bg-amber-600/20 text-amber-500 hover:bg-amber-600/40 rounded-lg font-bold">+</button>
+
+                <button onClick={() => handleNumber(0)} className="col-span-2 p-4 bg-white/5 hover:bg-white/10 text-white rounded-lg">0</button>
+                <button onClick={() => setDisplay(prev => prev.includes('.') ? prev : prev + '.')} className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-lg">.</button>
+                <button onClick={calculate} className="p-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]">=</button>
+            </div>
+        </div>
+    );
+
+    return (
+        <UniversalAppShell
+            appName="Calculator"
+            themeColor="#f59e0b"
+            windowAPI={windowAPI}
+            onHome={onHome}
+            sidebarContent={SidebarContent}
+        >
+            {MainContent}
+        </UniversalAppShell>
+    );
+};
+```
+
+```jsx
+// frontend\src\apps\CheckTask.jsx
+import React, { useState, useEffect, useRef } from "react";
+import "react-resizable/css/styles.css";
+// 1. Import at the top of your React file:
+import { getJobLists, createJobList, deleteJobList, getJobs, createJob, updateJob, removeJob } from "../api";
+
+
+
+// --- ICONS (SVG Helpers) ---
+const Icons = {
+    Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+    Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+    CheckCircle: () => <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>,
+    Star: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+    List: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+    Dots: () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>,
+    Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+};
+
+// B. Inside the CheckTask component, REPLACE the existing useState/useEffect block with this:
+const CheckTask = ({ windowAPI, onHome }) => {
+    // --- STATE MANAGEMENT ---
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [activeListId, setActiveListId] = useState("default");
+    const [activeMenuId, setActiveMenuId] = useState(null);
+    // 2. Replace "Data & Input State" and "EVENT HANDLERS" with this logic:
+    // JOBS DATA (Independent from Jobs)
+    const [lists, setLists] = useState([]); // Will load from DB
+    const [jobs, setJobs] = useState([]);   // Will load from DB
+    const [newJobText, setNewJobText] = useState("");
+
+
+    // 1. Use the correct property: list_id (from your debug log)
+
+
+    var activeList = lists.find(l => l.id === activeListId) || lists[0];
+    // Filter jobs for the current view
+    var currentJobs = jobs.filter(j => String(j.list_id) === String(activeListId));
+
+    // 2. Use the correct property: is_done (from your debug log)
+    // We use Number() because SQLite returns 0 or 1
+    var pendingJobs = currentJobs.filter(j => Number(j.is_done) === 0);
+    var completedJobs = currentJobs.filter(j => Number(j.is_done) === 1);
+
+    const [modal, setModal] = useState({
+        isOpen: false,
+        title: "",
+        value: "",
+        action: null
+    });
+    const renderModal = () => {
+        if (!modal.isOpen) return null;
+
+        const confirm = () => {
+            if (modal.value.trim()) modal.action(modal.value);
+            setModal({ ...modal, isOpen: false });
+        };
+
+        return (
+            <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 animate-in fade-in duration-200">
+                <div className="bg-[#111] border border-gray-700 rounded-xl p-5 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{modal.title}</h3>
+                    <input
+                        autoFocus
+                        type="text"
+                        value={modal.value}
+                        onChange={(e) => setModal({ ...modal, value: e.target.value })}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') confirm();
+                            if (e.key === 'Escape') setModal({ ...modal, isOpen: false });
+                        }}
+                        className="w-full bg-[#050505] border border-gray-700 rounded-md px-3 py-2 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-900 outline-none text-sm mb-4 placeholder-gray-600"
+                    />
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => setModal({ ...modal, isOpen: false })}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-white transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={confirm}
+                            className="px-4 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors shadow-lg shadow-indigo-900/20"
+                        >
+                            Valider
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+    // Load Data on Mount
+
+    // D. Add/Replace these list handlers:
+    const handleCreateList = () => {
+        setModal({
+            isOpen: true,
+            title: "Nouvelle Liste",
+            value: "",
+            action: async (name) => {
+                const newList = {
+                    id: `list-${Date.now()}`,
+                    title: name,
+                    type: 'user'
+                };
+                setLists(prev => [...prev, newList]);
+                await createJobList(newList);
+            }
+        });
+    };
+
+    const handleRenameList = () => {
+        const currentList = lists.find(l => l.id === activeListId);
+        if (!currentList) return;
+
+        setActiveMenuId(null); // Close the 3-dots menu
+        setModal({
+            isOpen: true,
+            title: "Renommer la liste",
+            value: currentList.title,
+            action: async (newName) => {
+                if (newName === currentList.title) return;
+                setLists(prev => prev.map(l => l.id === activeListId ? { ...l, title: newName } : l));
+                await updateJobList(activeListId, newName);
+            }
+        });
+    };
+
+    const handleDeleteList = async () => {
+        if (activeListId === 'default' || activeListId === 'starred') {
+            alert("Impossible de supprimer une liste système.");
+            return;
+        }
+        if (confirm("Supprimer cette liste et tous ses jobs ?")) {
+            const listToRemove = activeListId;
+            setActiveListId('default'); // Jump back to default
+            setLists(prev => prev.filter(l => l.id !== listToRemove)); // Optimistic
+            setJobs(prev => prev.filter(j => j.list_id !== listToRemove)); // Cleanup UI
+            await deleteJobList(listToRemove);
+        }
+    };
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const fetchedLists = await getJobLists();
+                if (fetchedLists.length > 0) setLists(fetchedLists);
+                const fetchedJobs = await getJobs();
+                setJobs(fetchedJobs);
+            } catch (err) {
+                console.error("Failed to load jobs", err);
+            }
+        };
+        loadData();
+    }, []);
+    useEffect(() => {
+        const initData = async () => {
+            try {
+                const [dbLists, dbJobs] = await Promise.all([getJobLists(), getJobs()]);
+                // If DB is empty, use defaults from the SQL migration, otherwise use fetched
+                setLists(dbLists.length ? dbLists : [{ id: "default", title: "Mes jobs", type: "system" }]);
+                setJobs(dbJobs);
+            } catch (e) {
+                console.error("Job System Error:", e);
+            }
+        };
+        initData();
+    }, []);
+    // --- STATE MANAGEMENT END ---
+
+    // --- EVENT HANDLERS ---
+
+    // Toggle Sidebar
+    const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+
+    // Global Click to Close Dropdowns
+    useEffect(() => {
+        const handleClickOutside = () => setActiveMenuId(null);
+        if (activeMenuId) window.addEventListener("click", handleClickOutside);
+        return () => window.removeEventListener("click", handleClickOutside);
+    }, [activeMenuId]);
+
+    const handleMenuToggle = (e, menuId) => {
+        e.stopPropagation(); // Prevent global click from closing immediately
+        setActiveMenuId(activeMenuId === menuId ? null : menuId);
+    };
+
+    // C. Replace handleAddTask with this:
+    const handleAddJob = async (e) => {
+        if ((e.key === 'Enter' || e.type === 'click') && newJobText.trim()) {
+            const tempId = "temp-" + Date.now();
+            const jobPayload = {
+                id: tempId,
+                title: newJobText,
+                list_id: String(activeListId)
+            };
+
+            // 1. Optimistic UI update
+            setJobs(prev => [jobPayload, ...prev]);
+            setNewJobText("");
+
+            try {
+                // 2. Wait for real DB object
+                const savedJob = await createJob(jobPayload);
+                // 3. Swap temp job with real job from DB (ensures persistence)
+                setJobs(prev => prev.map(j => j.id === tempId ? savedJob : j));
+            } catch (err) {
+                console.error("Job Creation Failed", err);
+                setJobs(prev => prev.filter(j => j.id !== tempId));
+            }
+        }
+    };
+
+    // E. Add/Replace job action handlers:
+    const handleToggleJob = async (jobId) => {
+        const job = jobs.find(j => j.id === jobId);
+        if (!job) return;
+
+        const newStatus = job.is_done ? 0 : 1;
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, is_done: newStatus } : j));
+        await updateJob(jobId, { is_done: newStatus });
+    };
+
+    const handleDeleteJob = async (jobId) => {
+        setJobs(prev => prev.filter(j => j.id !== jobId));
+        await removeJob(jobId);
+    };
+
+    // EXPANSION: Star functionality (Moves job to 'starred' list or back to 'default')
+    // Replace the Star handler to be type-safe
+    const handleStarJob = async (e, jobId) => {
+        e.stopPropagation();
+        const job = jobs.find(j => j.id === jobId);
+        if (!job) return;
+
+        // Toggle between "starred" list and "default" list
+        const targetListId = String(job.list_id) === 'starred' ? 'default' : 'starred';
+
+        // UI Update
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, list_id: targetListId } : j));
+
+        // Backend Update
+        await updateJob(jobId, { list_id: targetListId });
+    };
+
+
+
+    const handleClearCompleted = async () => {
+        if (confirm("Supprimer définitivement tous les jobs terminés de cette liste ?")) {
+            // Optimistic
+            setJobs(prev => prev.filter(j => !(j.list_id === activeListId && j.is_done)));
+            await clearCompletedJobs(activeListId);
+        }
+        setActiveMenuId(null);
+    };
+
+    // --- RENDERERS ---
+
+    // Filter JOBS (not tasks) based on activeListId
+    // A. The Floating Pill Header (Controls & Drag)
+    console.log(`Rendering List: ${activeListId} | Pending: ${pendingJobs.length} | Done: ${completedJobs.length}`);
+    const renderHeader = () => (
+        <div className="absolute -top-2 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
+            <div className="group pointer-events-auto mt-2 relative">
+                {/* Default State */}
+                <div className="bg-[#1a1a1a] border border-gray-600 rounded-full px-4 py-1.5 shadow-lg flex items-center gap-2 transition-all duration-300 group-hover:opacity-0 absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Google Jobs</span>
+                </div>
+
+                {/* Interactable State */}
+                <div className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 opacity-0 translate-y-2 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-200 ease-out origin-top">
+                    {/* Drag Handle */}
+                    <div className={`${windowAPI?.dragHandleClass || "custom-window-drag"} cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1`}>
+                        <span className="text-xs font-bold text-white">⋮⋮</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Grip</span>
+                    </div>
+
+                    {/* App Controls */}
+                    <div className="flex bg-black rounded p-0.5 border border-gray-800">
+                        <button onClick={toggleSidebar} className={`px-3 py-1 text-[9px] font-bold uppercase rounded transition-colors ${isSidebarOpen ? "bg-blue-900 text-white" : "text-gray-500 hover:text-gray-300"}`}>
+                            Sidebar
+                        </button>
+                        <button
+                            onClick={() => {
+                                console.log("--- JOB ENGINE DEBUG ---");
+                                console.log("Active List ID:", activeListId);
+                                console.log("Total Jobs in State:", jobs.length);
+                                console.log("Raw Jobs Array:", jobs);
+                                console.log("Raw Lists Array:", lists);
+                                alert(`Jobs: ${jobs.length} | Check Console (F12) for JSON`);
+                            }}
+                            className="mr-2 px-2 py-1 text-[10px] font-mono border border-indigo-900 text-indigo-400 rounded hover:bg-indigo-900/20"
+                        >
+                            DEBUG_DATA
+                        </button>
+                    </div>
+                    {onHome && (
+                        <button
+                            onClick={onHome}
+                            className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-600 text-gray-400 hover:text-white transition-colors ml-2"
+                        >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                        </button>
+                    )}
+                    <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 transition-colors ml-1">
+                        ×
+                    </button>
+                    
+                </div>
+            </div>
+        </div>
+    );
+    // --- SIDEBAR RENDERER ---
+    // Replace the existing renderSidebar function with this:
+    const renderSidebar = () => {
+        if (!isSidebarOpen) return null;
+
+        const systemLists = lists.filter(l => l.type === 'system');
+        const userLists = lists.filter(l => l.type === 'user');
+
+        // Helper to count active jobs per list
+        const getCount = (listId) => jobs.filter(j => j.list_id === listId && !j.is_done).length;
+
+        return (
+            <div className="w-64 bg-[#0a0a0a] border-r border-gray-800 flex flex-col h-full pt-2 animate-in slide-in-from-left-5 duration-300">
+                <div className="px-4 py-4 flex items-center gap-3">
+                    <button onClick={toggleSidebar} className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-800 rounded-full"><Icons.Menu /></button>
+                    <span className="text-lg font-bold text-gray-200 tracking-tight">CheckTask</span>
+                </div>
+
+                <div className="px-3 mb-6">
+                    <button onClick={() => document.getElementById('task-input')?.focus()} className="w-full flex items-center gap-3 bg-[#1a1a1a] hover:bg-[#222] border border-gray-700 text-gray-200 px-4 py-3 rounded-full shadow-lg transition-all group active:scale-95">
+                        <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full p-1 text-white shadow-inner"><Icons.Plus /></div>
+                        <span className="text-xs font-bold uppercase tracking-wider">Nouveau Job</span>
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scroll px-2 space-y-6">
+                    <div className="space-y-1">
+                        {systemLists.map(list => {
+                            const isActive = activeListId === list.id;
+                            const count = getCount(list.id);
+                            return (
+                                <div key={list.id} onClick={() => setActiveListId(list.id)} className={`flex items-center gap-4 px-4 py-2.5 rounded-r-full cursor-pointer transition-all text-sm font-medium select-none ${isActive ? "bg-indigo-900/20 text-indigo-400 border-l-2 border-indigo-500" : "text-gray-400 hover:bg-[#151515] hover:text-gray-200"}`}>
+                                    {list.id === 'starred' ? <Icons.Star /> : <Icons.CheckCircle />}
+                                    <span>{list.title}</span>
+                                    {count > 0 && <span className="ml-auto text-[10px] bg-gray-800 px-1.5 rounded text-gray-300">{count}</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div>
+                        <div className="px-4 flex justify-between items-center mb-2 border-t border-gray-800 pt-4 mt-2">
+                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-widest">Mes Listes</span>
+                        </div>
+                        <div className="space-y-1">
+                            {userLists.map(list => {
+                                const isActive = activeListId === list.id;
+                                const count = getCount(list.id);
+                                return (
+                                    <div key={list.id} onClick={() => setActiveListId(list.id)} className={`flex items-center gap-4 px-4 py-2 rounded-r-full cursor-pointer transition-all text-sm select-none ${isActive ? "bg-indigo-900/20 text-indigo-400 border-l-2 border-indigo-500" : "text-gray-400 hover:bg-[#151515] hover:text-gray-200"}`}>
+                                        <Icons.List />
+                                        <span className="truncate flex-1">{list.title}</span>
+                                        {count > 0 && <span className="text-[10px] text-gray-600">{count}</span>}
+                                    </div>
+                                );
+                            })}
+                            <button onClick={handleCreateList} className="w-full flex items-center gap-4 px-4 py-2 text-gray-500 hover:text-indigo-400 text-sm transition-colors mt-2">
+                                <div className="p-0.5"><Icons.Plus /></div>
+                                <span>Créer une liste</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+    // --- EMPTY STATE ILLUSTRATION (Dark Mode "Relaxed" Vibe) ---
+    const renderEmptyState = () => (
+        <div className="flex flex-col items-center justify-center h-[60%] animate-in fade-in zoom-in duration-500 select-none pointer-events-none">
+            {/* Illustration Container */}
+            <div className="relative w-48 h-32 mb-6 opacity-80">
+                {/* Abstract Desk */}
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gray-700 rounded-full"></div>
+                {/* Screen */}
+                <div className="absolute bottom-4 left-10 w-24 h-16 bg-[#111] border border-gray-600 rounded-lg transform -rotate-3 z-10 shadow-lg"></div>
+
+                {/* Abstract Person Head */}
+                <div className="absolute top-0 right-16 w-8 h-8 bg-blue-900 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                {/* Abstract Body */}
+                <div className="absolute bottom-2 right-12 w-16 h-12 bg-blue-900/20 rounded-t-xl border border-blue-900/30"></div>
+
+                {/* The "Checkmark" floating */}
+                <div className="absolute top-2 left-6 w-10 h-10 bg-[#000] border border-green-500/50 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(34,197,94,0.2)] animate-bounce">
+                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+            </div>
+
+            <h2 className="text-xl font-bold text-gray-200 mb-2 tracking-tight">Aucune tâche pour l'instant</h2>
+            <p className="text-sm text-gray-500 max-w-xs text-center leading-relaxed">
+                Ajoutez vos tâches et faites-en le suivi dans Votre application de gestion de tâches personnalisée. Restez organisé et productif avec style !
+            </p>
+        </div>
+    );
+
+    // --- MAIN CONTENT RENDERER ---
+    const renderMainContent = () => {
+        activeList = lists.find(l => l.id === activeListId) || lists[0];
+        // Filter jobs for the current view
+        currentJobs = jobs.filter(j => String(j.list_id) === String(activeListId));
+
+        // 2. Use the correct property: is_done (from your debug log)
+        // We use Number() because SQLite returns 0 or 1
+        pendingJobs = currentJobs.filter(j => Number(j.is_done) === 0);
+        completedJobs = currentJobs.filter(j => Number(j.is_done) === 1);
+
+        return (
+            <div className="flex-1 flex flex-col h-full bg-[#050505] relative w-full min-w-0">
+
+                {/* 1. Top Toolbar */}
+                <div className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0a0a0a] shrink-0 z-20">
+                    <div className="flex items-center gap-3">
+                        {!isSidebarOpen && (
+                            <button onClick={toggleSidebar} className="text-gray-400 hover:text-white mr-2">
+                                <Icons.Menu />
+                            </button>
+                        )}
+                        <h1 className="text-xl font-bold text-gray-200 truncate">{activeList?.title || "Aucune liste sélectionnée"}</h1>
+
+                        {/* Progress Bar Addon */}
+                        <div className="flex-1 mx-6 flex flex-col justify-center max-w-xs">
+                            {(() => {
+                                const listJobs = jobs.filter(j => j.list_id === activeListId);
+                                const total = listJobs.length;
+                                const done = listJobs.filter(j => j.is_done).length;
+                                const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+
+                                if (total === 0) return null;
+
+                                return (
+                                    <div className="group cursor-help">
+                                        <div className="flex justify-between text-[10px] font-mono text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <span>PROGRESSION</span>
+                                            <span>{percent}%</span>
+                                        </div>
+                                        <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-500 ease-out ${percent === 100 ? 'bg-green-500' : 'bg-indigo-500'}`}
+                                                style={{ width: `${percent}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* 3-Dots Menu */}
+                    <div className="relative">
+                        <button
+                            onClick={(e) => handleMenuToggle(e, 'main-options')}
+                            className={`p-2 rounded-full transition-colors ${activeMenuId === 'main-options' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white hover:bg-gray-900'}`}
+                        >
+                            <Icons.Dots />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {activeMenuId === 'main-options' && (
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-[#111] border border-gray-700 rounded-lg shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                {/* Rename (User lists only) */}
+                                {activeList.type === 'user' && (
+                                    <button onClick={handleRenameList} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 flex items-center gap-2">
+                                        <span className="opacity-50">✎</span> Renommer la liste
+                                    </button>
+                                )}
+
+                                {/* Clear Completed */}
+                                <button onClick={handleClearCompleted} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 flex items-center gap-2">
+                                    <span className="opacity-50">✓</span> Nettoyer terminés
+                                </button>
+
+                                <div className="h-px bg-gray-800 my-1"></div>
+
+                                {/* Delete (User lists only) */}
+                                {activeList.type === 'user' && (
+                                    <button onClick={handleDeleteList} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 flex items-center gap-2">
+                                        <Icons.Trash /> Supprimer la liste
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 2. Add Task Input Area */}
+                <div className="px-6 py-4 shrink-0 bg-[#050505] z-10">
+                    <div className="group relative bg-[#111] border border-gray-700 rounded-t-lg focus-within:bg-[#1a1a1a] focus-within:border-blue-500/50 transition-all shadow-lg">
+                        <div className="flex items-center gap-3 p-3 cursor-text" onClick={() => document.getElementById('task-input').focus()}>
+                            <div className="w-5 h-5 flex items-center justify-center border-2 border-gray-600 rounded-full group-hover:border-blue-500 transition-colors">
+                                <span className="text-lg font-bold leading-none mb-0.5 text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">+</span>
+                            </div>
+                            <input
+                                id="task-input"
+                                type="text"
+                                value={newJobText} // Updated variable
+                                onChange={(e) => setNewJobText(e.target.value)} // Updated setter
+                                onKeyDown={handleAddJob} // Updated handler
+                                placeholder={`Ajouter un job à "${activeList?.title}"`}
+                                autoComplete="off"
+                                className="bg-transparent border-none outline-none text-sm text-gray-200 placeholder-gray-500 flex-1 font-medium h-6"
+                            />
+                        </div>
+                        {/* Bottom Active Bar */}
+                        <div className="h-0.5 w-0 bg-blue-500 mx-auto group-focus-within:w-full transition-all duration-300"></div>
+
+                        {/* Helper Text (Optional) */}
+                        {newJobText && (
+                            <div className="absolute right-3 top-3 text-[10px] text-gray-500 font-mono uppercase border border-gray-700 px-1 rounded">
+                                Enter ↵
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 3. Task List Container (Start) */}
+                <div className="flex-1 overflow-y-auto custom-scroll px-6 pb-6 space-y-4">
+                    {/* Logic to render Empty State or List */}
+                    {pendingJobs.length === 0 && completedJobs.length === 0 ? (
+                        renderEmptyState()
+                    ) : (
+                        <div className="space-y-1 animate-in slide-in-from-bottom-2 duration-300">
+                            {/* PENDING JOBS LIST */}
+                            {pendingJobs.map(job => (
+                                <div
+                                    key={job.id}
+                                    className="group flex items-center gap-3 p-3 bg-[#111] border border-gray-800 rounded-lg hover:border-blue-900/50 hover:bg-[#161616] transition-all shadow-sm cursor-default"
+                                >
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleToggleJob(job.id); }}
+                                        className="w-5 h-5 rounded-full border-2 border-gray-500 hover:border-blue-500 flex items-center justify-center transition-colors group-hover:scale-110"
+                                    >
+                                        <div className={`w-3 h-3 bg-blue-500 rounded-full transition-opacity ${job.is_done ? 'opacity-100' : 'opacity-0 group-hover:opacity-20'}`} />
+                                    </button>
+
+                                    <span className="flex-1 text-sm text-gray-200 font-medium truncate">{job.title}</span>
+
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {/* Star Button linked to handleStarJob */}
+                                        <button
+                                            onClick={(e) => handleStarJob(e, job.id)}
+                                            className={`hover:text-yellow-400 ${job.list_id === 'starred' ? 'text-yellow-400' : 'text-gray-600'}`}
+                                        >
+                                            <Icons.Star />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id); }}
+                                            className="text-gray-600 hover:text-red-400"
+                                        >
+                                            <Icons.Trash />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* COMPLETED JOBS ACCORDION */}
+                            {completedJobs.length > 0 && (
+                                <div className="pt-6">
+                                    <div className="flex items-center gap-4 mb-2">
+                                        <div className="h-px bg-gray-800 flex-1"></div>
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                            Terminées ({completedJobs.length})
+                                        </span>
+                                        <div className="h-px bg-gray-800 flex-1"></div>
+                                    </div>
+
+                                    <div className="space-y-1 opacity-60 hover:opacity-100 transition-opacity duration-300">
+                                        {completedJobs.map(job => (
+                                            <div key={job.id} className="group flex items-center gap-3 p-3 bg-black border border-gray-900 rounded-lg">
+                                                <button
+                                                    onClick={() => handleToggleJob(job.id)}
+                                                    className="w-5 h-5 rounded-full bg-blue-900 border-2 border-blue-700 flex items-center justify-center text-white shadow-[0_0_10px_rgba(30,58,138,0.5)]"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                </button>
+                                                <span className="flex-1 text-sm text-gray-500 line-through decoration-gray-700 decoration-2">{job.title}</span>
+                                                <button
+                                                    onClick={() => handleDeleteJob(job.id)}
+                                                    className="text-gray-700 hover:text-red-900 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Icons.Trash />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // --- FINAL ASSEMBLY ---
+    return (
+        <div className="h-full w-full flex flex-col pt-10 overflow-hidden relative select-none font-sans text-gray-100">
+            {/* Header / Draggable Pill */}
+            {renderHeader()}
+
+            {/* Main Application Container */}
+            <div className="flex-1 flex overflow-hidden bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl mx-1 mb-1 relative isolate">
+
+                {/* Left Sidebar */}
+                {renderSidebar()}
+
+                {/* Vertical Divider (Visual only, separates sidebar from main content) */}
+                {isSidebarOpen && <div className="w-px bg-gray-800 h-full shadow-[0_0_10px_rgba(0,0,0,1)] z-10 hidden sm:block" />}
+
+                {/* Main Right Content */}
+                {renderMainContent()}
+
+                {/* Bottom Right Resize Visual Hint */}
+                <div className="absolute bottom-1 right-1 pointer-events-none opacity-30 z-50">
+                    <div className="w-3 h-3 border-r-2 border-b-2 border-gray-500"></div>
+                </div>
+
+                {/* INSERT THIS LINE HERE: */}
+                {renderModal()}
+            </div>
+        </div>
+    );
+};
+
+export default CheckTask;
 ```
 
 ```jsx
@@ -2627,6 +4528,201 @@ const CryptoApp = () => {
 };
 
 export default CryptoApp;
+```
+
+```jsx
+// frontend\src\apps\LinkSaverApp.jsx
+import React, { useState, useMemo } from 'react';
+import { useAppEngine } from '../hooks/useAppEngine';
+import { UniversalAppShell, UaeInput, UaeListItem } from '../components/UniversalComponents'; // Ensure these match your paths
+
+export const LinkSaverApp = ({ windowAPI, onHome }) => {
+    // 1. Instantly spin up a backend table & API for this app
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [tempCategoryName, setTempCategoryName] = useState("");
+    const [customCategories, setCustomCategories] = useState([]);
+
+    const {
+        data: links,
+        isLoading,
+        addEntity,
+        removeEntity
+    } = useAppEngine(
+        'app_linksaver',
+        { name: 'LinkSaver', themeColor: '#10b981' },
+        'bookmark' // The entity type
+    );
+
+    // 2. App-specific state
+    const [activeCategory, setActiveCategory] = useState("General");
+    const [newLinkUrl, setNewLinkUrl] = useState("");
+
+    // 3. Dynamically extract categories from the JSON data
+    // Replace your existing `categories` useMemo block with this:
+    const categories = useMemo(() => {
+        // 1. Start with 'General' and any custom empty folders the user created
+        const cats = new Set(["General", ...customCategories]);
+
+        // 2. Add folders that currently have links in them
+        links.forEach(link => {
+            if (link.category) cats.add(link.category);
+        });
+
+        return Array.from(cats);
+    }, [links, customCategories]); // <-- Note the updated dependency array
+
+    // 4. Generate Sidebar Content
+    const SidebarContent = (
+        <div className="p-4 space-y-2">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Dossiers</h3>
+            {categories.map(cat => {
+                const count = links.filter(l => l.category === cat).length;
+                return (
+                    <div
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={`flex justify-between items-center px-3 py-2 rounded-lg cursor-pointer transition-all text-sm
+                            ${activeCategory === cat ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                    >
+                        <span>📁 {cat}</span>
+                        {count > 0 && <span className="text-[10px] bg-black px-1.5 py-0.5 rounded text-gray-500">{count}</span>}
+                    </div>
+                );
+            })}
+
+            <button
+                onClick={() => setIsModalOpen(true)}
+                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-emerald-400 mt-4"
+            >
+                + Ajouter dossier
+            </button>
+        </div>
+    );
+    // 5. Handle adding a new link
+    const handleAddLink = async (value) => {
+        try {
+            // value is the URL typed by the user
+            let url = value;
+            if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+            // Clean up the URL to use as a temporary title
+            const title = new URL(url).hostname.replace('www.', '');
+
+            // BOOM! Saved to database instantly.
+            await addEntity({
+                title: title,
+                url: url,
+                category: activeCategory
+            });
+
+            setNewLinkUrl(""); // Clear input
+        } catch (e) {
+            console.error("Invalid URL", e);
+            alert("URL invalide !");
+        }
+    };
+    // 6. Generate Main Content
+    const MainContent = (
+        <div className="max-w-3xl mx-auto">
+            {/* Standard Input Component */}
+            <UaeInput
+                value={newLinkUrl}
+                onChange={setNewLinkUrl}
+                onSubmit={handleAddLink}
+                placeholder={`Coller un lien dans "${activeCategory}"...`}
+                icon="🔗"
+            />
+
+            {isLoading ? (
+                <div className="text-center text-gray-500 mt-10 text-sm animate-pulse">Chargement des liens...</div>
+            ) : (
+                <div className="mt-6 space-y-2">
+                    {links.filter(l => l.category === activeCategory).map(link => (
+                        <UaeListItem
+                            key={link.id}
+                            title={link.title}
+                            subtitle={link.url}
+                            onClick={() => window.open(link.url, '_blank')}
+                            actions={
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); removeEntity(link.id); }}
+                                    className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                                >
+                                    🗑️
+                                </button>
+                            }
+                        />
+                    ))}
+                    {links.filter(l => l.category === activeCategory).length === 0 && (
+                        <div className="text-center text-gray-600 mt-10 text-sm">
+                            Aucun lien dans ce dossier.
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+    // 7. Final Assembly
+    return (
+        <UniversalAppShell
+            appName="LinkSaver"
+            themeColor="#10b981"
+            windowAPI={windowAPI}  // <--- Pass it down to the shell!
+            onHome={onHome}        // <--- Pass it down so the Home button works!
+            sidebarContent={SidebarContent}
+            headerActions={
+                <span className="text-xs text-emerald-500 font-mono bg-emerald-900/20 px-2 py-1 rounded">
+                    {links.length} saved
+                </span>
+            }
+        >
+            {MainContent}
+            {isModalOpen && (
+                <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-[#111] border border-gray-700 rounded-xl p-6 w-full max-w-xs shadow-2xl">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase mb-4">Nouveau Dossier</h3>
+                        <input
+                            autoFocus
+                            className="w-full bg-black border border-gray-800 rounded px-3 py-2 text-white mb-4 outline-none focus:border-emerald-500"
+                            value={tempCategoryName}
+                            onChange={e => setTempCategoryName(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    const newCat = tempCategoryName.trim();
+                                    if (newCat) {
+                                        setCustomCategories(prev => [...prev, newCat]);
+                                        setActiveCategory(newCat);
+                                    }
+                                    setIsModalOpen(false);
+                                    setTempCategoryName(""); // Reset input
+                                }
+                            }}
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => { setIsModalOpen(false); setTempCategoryName(""); }} className="text-xs text-gray-500">Annuler</button>
+                            <button
+                                onClick={() => {
+                                    const newCat = tempCategoryName.trim();
+                                    if (newCat) {
+                                        setCustomCategories(prev => [...prev, newCat]);
+                                        setActiveCategory(newCat);
+                                    }
+                                    setIsModalOpen(false);
+                                    setTempCategoryName(""); // Reset input
+                                }}
+                                className="bg-emerald-600 px-4 py-1 rounded text-xs font-bold text-white"
+                            >
+                                Créer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </UniversalAppShell>
+
+    );
+};
 ```
 
 ```jsx
@@ -3556,7 +5652,8 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
 
     const saveNote = async (logId) => {
         // Implement API call to save note for specific log
-        // console.log("Saving note:", noteDraft, " for log:", logId);
+        console.log("Saving note:", noteDraft, " for log:", logId);
+        await API.updateManualNote(logId, noteDraft);
         // await API.updateLog(logId, { manual_note: noteDraft });
         broadcastSync();
     };
@@ -4103,6 +6200,59 @@ const TasksApp = ({ windowAPI, isHeaderOnly }) => {
 };
 
 export default TasksApp;
+```
+
+```jsx
+// frontend\src\apps\UaeLauncher.jsx
+import React from 'react';
+export const UaeLauncher = ({ apps, onLaunch, windowAPI }) => {
+    return (
+        <div className="h-full w-full bg-black flex flex-col items-center justify-center relative overflow-hidden select-none">
+            {/* Background Ambient Glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-indigo-900/20 blur-[100px] rounded-full pointer-events-none"></div>
+
+            {/* THE STANDARD DRAGGABLE PILL */}
+            <div className="absolute -top-2 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
+                <div className="group pointer-events-auto mt-2 relative">
+                    {/* Default State */}
+                    <div className="bg-[#1a1a1a] border border-gray-600 rounded-full px-4 py-1.5 shadow-lg flex items-center gap-2 transition-all duration-300 group-hover:opacity-0 absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                        <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Workspace Hub</span>
+                    </div>
+
+                    {/* Expanded State */}
+                    <div className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 opacity-0 translate-y-2 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-200 ease-out origin-top whitespace-nowrap">
+                        <div className={`${windowAPI?.dragHandleClass || "custom-window-drag"} cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1`}>
+                            <span className="text-xs font-bold text-white">⋮⋮</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Grip</span>
+                        </div>
+                        <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
+                            ×
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* CONTENT */}
+            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-100 to-gray-500 tracking-tighter mb-12 z-10 mt-10">
+                Workspace OS
+            </h1>
+
+            {/* App Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-8 z-10">
+                {apps.map(app => (
+                    <div key={app.id} onClick={() => onLaunch(app.id)} className="group flex flex-col items-center gap-3 cursor-pointer">
+                        <div className="w-20 h-20 rounded-2xl bg-[#111] border border-gray-800 flex items-center justify-center shadow-2xl group-hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300" style={{ backgroundColor: app.color }}></div>
+                            <span className="text-3xl filter drop-shadow-lg group-hover:scale-110 transition-transform">{app.icon}</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors tracking-wide">{app.name}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 ```
 
 ```jsx
@@ -5647,6 +7797,217 @@ export default TaskWidget;
 ```
 
 ```jsx
+// frontend\src\components\UniversalAppShell.jsx
+import React, { useState } from 'react';
+
+// A standardized layout for ANY new application
+export const UniversalAppShell = ({ 
+    appName, 
+    themeColor = "#4f46e5", 
+    windowAPI, 
+    sidebarContent, 
+    headerActions, 
+    children 
+}) => {
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+    return (
+        <div className="h-full w-full flex flex-col pt-10 overflow-hidden relative select-none font-sans text-gray-100 bg-black">
+            
+            {/* Draggable Header Pill */}
+            <div className="absolute -top-2 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
+                <div className="group pointer-events-auto mt-2 relative">
+                    <div className="bg-[#1a1a1a] border border-gray-600 rounded-full px-4 py-1.5 shadow-lg flex items-center gap-2 transition-all duration-300 group-hover:opacity-0 absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: themeColor }}></span>
+                        <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">{appName}</span>
+                    </div>
+                    
+                    <div className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 opacity-0 translate-y-2 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-200 ease-out origin-top">
+                        <div className="custom-window-drag cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1">
+                            <span className="text-xs font-bold text-white">⋮⋮</span>
+                        </div>
+                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="px-3 py-1 text-[9px] font-bold uppercase rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+                            Menu
+                        </button>
+                        <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 transition-colors ml-2">×</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Application Container */}
+            <div className="flex-1 flex overflow-hidden bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl mx-1 mb-1 relative isolate">
+                
+                {/* Sidebar Slot */}
+                {isSidebarOpen && sidebarContent && (
+                    <div className="w-64 bg-[#0a0a0a] border-r border-gray-800 flex flex-col h-full animate-in slide-in-from-left-5 duration-300">
+                        {sidebarContent}
+                    </div>
+                )}
+
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col h-full bg-[#050505] relative w-full min-w-0">
+                    {/* Top Toolbar Slot */}
+                    <div className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0a0a0a] shrink-0 z-20">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-bold text-gray-200 truncate">{appName}</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {headerActions}
+                        </div>
+                    </div>
+
+                    {/* Content Slot */}
+                    <div className="flex-1 overflow-y-auto custom-scroll p-6">
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+```
+
+```jsx
+// frontend\src\components\UniversalComponents.jsx
+import React from 'react';
+
+// A standardized Input field that fits the UAE dark theme perfectly
+export const UaeInput = ({ value, onChange, onSubmit, placeholder, icon = "+" }) => {
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && value.trim()) {
+            onSubmit(value);
+        }
+    };
+
+    return (
+        <div className="group relative bg-[#111] border border-gray-700 rounded-lg focus-within:bg-[#1a1a1a] focus-within:border-indigo-500/50 transition-all shadow-lg mb-4">
+            <div className="flex items-center gap-3 p-3">
+                <div className="w-6 h-6 flex items-center justify-center border-2 border-gray-600 rounded-full group-hover:border-indigo-500 transition-colors text-indigo-500 font-bold text-sm">
+                    {icon}
+                </div>
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    className="bg-transparent border-none outline-none text-sm text-gray-200 placeholder-gray-500 flex-1 font-medium h-6"
+                />
+            </div>
+            <div className="h-0.5 w-0 bg-indigo-500 mx-auto group-focus-within:w-full transition-all duration-300 rounded-b-lg"></div>
+        </div>
+    );
+};
+
+// A standardized List Item block
+export const UaeListItem = ({ title, subtitle, onClick, actions, isActive }) => (
+    <div
+        onClick={onClick}
+        className={`group flex items-center justify-between p-3 border rounded-lg transition-all shadow-sm cursor-pointer mb-2
+            ${isActive ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-[#111] border-gray-800 hover:border-gray-600 hover:bg-[#161616]'}`}
+    >
+        <div className="flex flex-col">
+            <span className="text-sm text-gray-200 font-medium">{title}</span>
+            {subtitle && <span className="text-xs text-gray-500">{subtitle}</span>}
+        </div>
+        {/* Actions slot (e.g., delete button). Make sure to use e.stopPropagation() on buttons passed here! */}
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {actions}
+        </div>
+    </div>
+);
+
+// The Universal App Shell
+export const UniversalAppShell = ({
+    appName, themeColor = "#4f46e5", windowAPI, sidebarContent, headerActions, children, onHome
+}) => {
+    const [isSidebarOpen, setSidebarOpen] = React.useState(true);
+
+    return (
+        <div className="h-full w-full flex flex-col pt-10 overflow-hidden relative select-none font-sans text-gray-100">
+
+            {/* Draggable Header Pill */}
+            <div className="absolute -top-2 left-0 right-0 h-14 z-50 flex justify-center items-start pointer-events-none">
+                <div className="group pointer-events-auto mt-2 relative">
+
+                    {/* 1. Default State (Simple Pill) */}
+                    <div className="bg-[#1a1a1a] border border-gray-600 rounded-full px-4 py-1.5 shadow-lg flex items-center gap-2 transition-all duration-300 group-hover:opacity-0 absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: themeColor }}></span>
+                        <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">{appName}</span>
+                    </div>
+
+                    {/* 2. Expanded State (Hover) */}
+                    <div className="bg-[#111] border border-gray-500 rounded-xl p-1.5 shadow-2xl flex items-center gap-3 opacity-0 translate-y-2 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-200 ease-out origin-top whitespace-nowrap">
+
+                        {/* FIXED: Dynamic Drag Handle connected to HDWindowFrame */}
+                        <div className={`${windowAPI?.dragHandleClass || "custom-window-drag"} cursor-move px-2 py-1 hover:bg-gray-800 rounded flex items-center gap-2 border-r border-gray-700 mr-1`}>
+                            <span className="text-xs font-bold text-white">⋮⋮</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Grip</span>
+                        </div>
+
+                        {/* Navigation / Actions */}
+                        <div className="flex bg-black rounded p-0.5 border border-gray-800">
+                            {sidebarContent && (
+                                <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="px-3 py-1 text-[9px] font-bold uppercase rounded text-gray-500 hover:text-white transition-colors">
+                                    Menu
+                                </button>
+                            )}
+                            {onHome && (
+                                <button onClick={onHome} className="px-3 py-1 text-[9px] font-bold uppercase rounded text-gray-500 hover:text-white transition-colors border-l border-gray-800">
+                                    Home
+                                </button>
+                            )}
+                        </div>
+
+                        {/* FIXED: Close Button calling the API */}
+                        <button onClick={() => windowAPI?.close?.()} className="w-5 h-5 flex items-center justify-center rounded-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white transition-colors ml-2">
+                            ×
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Application Container */}
+            <div className="flex-1 flex overflow-hidden bg-[#050505] rounded-xl border border-gray-800/50 shadow-2xl mx-1 mb-1 relative isolate">
+
+                {/* Sidebar Slot */}
+                {isSidebarOpen && sidebarContent && (
+                    <div className="w-64 bg-[#0a0a0a] border-r border-gray-800 flex flex-col h-full animate-in slide-in-from-left-5 duration-300">
+                        {sidebarContent}
+                    </div>
+                )}
+
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col h-full bg-[#050505] relative w-full min-w-0">
+
+                    {/* Top Toolbar Slot */}
+                    <div className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0a0a0a] shrink-0 z-20">
+                        <div className="flex items-center gap-3">
+                            {/* If sidebar is closed, show a tiny hamburger menu to reopen it */}
+                            {!isSidebarOpen && sidebarContent && (
+                                <button onClick={() => setSidebarOpen(true)} className="text-gray-400 hover:text-white mr-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                </button>
+                            )}
+                            <h1 className="text-xl font-bold text-gray-200 truncate">{appName}</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {headerActions}
+                        </div>
+                    </div>
+
+                    {/* Content Slot */}
+                    <div className="flex-1 overflow-y-auto custom-scroll p-6">
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+```
+
+```jsx
 // frontend\src\components\WindowFrame.jsx
 import React, { useRef } from 'react'; 
 import Draggable from 'react-draggable';
@@ -5703,6 +8064,91 @@ const WindowFrame = ({ title, onClose, children, initialPos = { x: 100, y: 100 }
 };
 
 export default WindowFrame;
+```
+
+```js
+// frontend\src\hooks\useAppEngine.js
+import { useState, useEffect, useCallback } from 'react';
+import { registerUaeApp, getUaeEntities, createUaeEntity, updateUaeEntity, deleteUaeEntity } from '../api';
+
+export function useAppEngine(appId, appConfig, entityType) {
+    const [data, setData] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // 1. Initialize App & Fetch Data
+    useEffect(() => {
+        let isMounted = true;
+        const init = async () => {
+            try {
+                setIsLoading(true);
+                // Auto-register app in the backend registry (idempotent)
+                await registerUaeApp({ id: appId, name: appConfig.name, theme_color: appConfig.themeColor });
+
+                // Fetch the specific entity type for this app
+                const entities = await getUaeEntities(appId, entityType);
+                if (isMounted) {
+                    setData(entities);
+                    setError(null);
+                }
+            } catch (err) {
+                if (isMounted) setError(err.message);
+                console.error(`[UAE] Init Error for ${appId}:`, err);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+        init();
+        return () => { isMounted = false; };
+    }, [appId, entityType]);
+    // In useAppEngine.js, make sure you await registration fully before fetching
+    // Insert inside useAppEngine, before the return:
+
+    // CREATE
+    const addEntity = useCallback(async (payload) => {
+        const tempId = `temp_${Date.now()}`;
+        const optimisticEntity = { id: tempId, app_id: appId, entity_type: entityType, ...payload, created_at: Date.now() };
+
+        setData(prev => [optimisticEntity, ...prev]); // Optimistic Update
+
+        try {
+            const saved = await createUaeEntity(appId, entityType, payload);
+            // Replace temp ID with real DB ID & merged data
+            setData(prev => prev.map(item => item.id === tempId ? { ...item, ...saved, ...saved.data } : item));
+            return saved;
+        } catch (err) {
+            setData(prev => prev.filter(item => item.id !== tempId)); // Rollback
+            throw err;
+        }
+    }, [appId, entityType]);
+
+    // UPDATE
+    const updateEntity = useCallback(async (id, payload) => {
+        // Optimistic Update
+        setData(prev => prev.map(item => item.id === id ? { ...item, ...payload, updated_at: Date.now() } : item));
+        try {
+            await updateUaeEntity(id, payload);
+        } catch (err) {
+            // In a production app, we'd rollback here using a ref of the previous state
+            console.error("[UAE] Update Failed", err);
+            throw err;
+        }
+    }, []);
+
+    // DELETE
+    const removeEntity = useCallback(async (id) => {
+        setData(prev => prev.filter(item => item.id !== id)); // Optimistic Update
+        try {
+            await deleteUaeEntity(id);
+        } catch (err) {
+            console.error("[UAE] Delete Failed", err);
+            throw err;
+        }
+    }, []);
+
+    // Update the return statement to expose everything:
+    return { data, isLoading, error, addEntity, updateEntity, removeEntity };
+}
 ```
 
 ```jsx
